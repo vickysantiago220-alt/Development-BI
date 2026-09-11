@@ -1,12 +1,9 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { exportPlanningPdf, exportPlanningPptx } from "@/lib/export-planning";
 import {
-  AlertTriangle,
-  CalendarDays,
-  CheckCircle2,
-  Clock3,
-  RefreshCw,
+  AlertTriangle, CalendarDays, CheckCircle2, Clock3, RefreshCw, FileDown, Presentation,
 } from "lucide-react";
 
 export default function PlanejamentoPage() {
@@ -14,6 +11,9 @@ export default function PlanejamentoPage() {
   const [loading, setLoading] = useState(true);
   const [currentPage, setCurrentPage] = useState(1);
   const [viewMode, setViewMode] = useState<"lista" | "calendario">("lista");
+  const [syncing, setSyncing] = useState(false);
+  const [syncMessage, setSyncMessage] = useState<"idle" | "success" | "error">("idle");
+  const [lastSync, setLastSync] = useState<string | null>(null);
   const pageSize = 10;
 
   useEffect(() => {
@@ -61,7 +61,39 @@ export default function PlanejamentoPage() {
     const type = String(task.status?.type || "").toLowerCase();
     const name = String(task.status?.name || "").toLowerCase();
 
-    return (
+    const getCalendarSummary = (dayTasks: any[]) => {
+    const developers = new Map<string, number>();
+    const projects = new Map<string, number>();
+
+    dayTasks.forEach((task: any) => {
+      const responsibles = task.responsible?.length
+        ? task.responsible
+        : ["Sem responsável"];
+
+      responsibles.forEach((name: string) => {
+        developers.set(name, (developers.get(name) || 0) + 1);
+      });
+
+      const project =
+        task.project?.name && task.project.name !== "hidden"
+          ? task.project.name
+          : task.list?.name || "Sem projeto";
+
+      projects.set(project, (projects.get(project) || 0) + 1);
+    });
+
+    return {
+      developers: Array.from(developers.entries())
+        .sort((a, b) => b[1] - a[1])
+        .slice(0, 4),
+      projects: Array.from(projects.entries())
+        .sort((a, b) => b[1] - a[1])
+        .slice(0, 4),
+      totalDevelopers: developers.size,
+      totalProjects: projects.size,
+    };
+  };
+  return (
       type === "closed" ||
       type === "done" ||
       [
@@ -418,6 +450,38 @@ export default function PlanejamentoPage() {
     return "bg-zinc-100 text-zinc-700";
   };
 
+  const getCalendarSummary = (dayTasks: any[]) => {
+    const developers = new Map<string, number>();
+    const projects = new Map<string, number>();
+
+    dayTasks.forEach((task: any) => {
+      const responsibles = task.responsible?.length
+        ? task.responsible
+        : ["Sem responsável"];
+
+      responsibles.forEach((name: string) => {
+        developers.set(name, (developers.get(name) || 0) + 1);
+      });
+
+      const project =
+        task.project?.name && task.project.name !== "hidden"
+          ? task.project.name
+          : task.list?.name || "Sem projeto";
+
+      projects.set(project, (projects.get(project) || 0) + 1);
+    });
+
+    return {
+      developers: Array.from(developers.entries())
+        .sort((a, b) => b[1] - a[1])
+        .slice(0, 4),
+      projects: Array.from(projects.entries())
+        .sort((a, b) => b[1] - a[1])
+        .slice(0, 4),
+      totalDevelopers: developers.size,
+      totalProjects: projects.size,
+    };
+  };
   return (
     <div className="min-h-screen bg-[#f7f7f8]">
       <header className="flex min-h-20 items-center justify-between border-b border-zinc-200 bg-white px-5 lg:px-8">
@@ -435,13 +499,79 @@ export default function PlanejamentoPage() {
           </p>
         </div>
 
-        <button
-          onClick={() => window.location.reload()}
-          className="flex items-center gap-2 rounded-xl bg-zinc-950 px-4 py-2.5 text-sm font-medium text-white shadow-sm hover:bg-zinc-800"
-        >
-          <RefreshCw className="h-4 w-4" />
-          Atualizar
-        </button>
+        <div className="mb-4 space-y-2">
+        {syncMessage === "success" && (
+          <div className="flex items-center gap-3 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800">
+            <CheckCircle2 className="h-5 w-5 shrink-0" />
+            <div>
+              <p className="font-semibold">Sincronização concluída!</p>
+              <p className="text-xs text-emerald-700">Os dados do ClickUp foram atualizados com sucesso.</p>
+            </div>
+          </div>
+        )}
+        {syncMessage === "error" && (
+          <div className="flex items-center gap-3 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">
+            <AlertTriangle className="h-5 w-5 shrink-0" />
+            <div>
+              <p className="font-semibold">Não foi possível sincronizar.</p>
+              <p className="text-xs text-red-700">Verifique a conexão com o ClickUp e tente novamente.</p>
+            </div>
+          </div>
+        )}
+        {syncing && (
+          <div className="flex items-center gap-3 rounded-xl border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-800">
+            <RefreshCw className="h-5 w-5 shrink-0 animate-spin" />
+            <div>
+              <p className="font-semibold">Sincronizando com o ClickUp...</p>
+              <p className="text-xs text-blue-700">Estamos buscando as informações mais recentes. Esse processo pode levar alguns instantes.</p>
+            </div>
+          </div>
+        )}
+        {lastSync && !syncing && (
+          <p className="text-xs text-zinc-500">Última sincronização: <span className="font-semibold text-zinc-700">{lastSync}</span></p>
+        )}
+      </div>
+      <div className="flex flex-wrap items-center gap-2">
+  <button
+    onClick={() => exportPlanningPdf(planning)}
+    className="flex items-center gap-2 rounded-xl border border-zinc-200 bg-white px-4 py-2.5 text-sm font-medium text-zinc-700 shadow-sm hover:bg-zinc-50"
+  >
+    <FileDown className="h-4 w-4" />
+    PDF
+  </button>
+
+  <button
+    onClick={() => exportPlanningPptx(planning)}
+    className="flex items-center gap-2 rounded-xl border border-zinc-200 bg-white px-4 py-2.5 text-sm font-medium text-zinc-700 shadow-sm hover:bg-zinc-50"
+  >
+    <Presentation className="h-4 w-4" />
+    PPTX
+  </button>
+
+  <button
+    onClick={async () => {
+            try {
+              setSyncing(true);
+              const response = await fetch("/api/clickup/tasks", { cache: "no-store" });
+              if (!response.ok) throw new Error("Falha ao sincronizar com o ClickUp.");
+              const fresh = await fetch("/api/clickup/cache", { cache: "no-store" });
+              if (!fresh.ok) throw new Error("Falha ao atualizar os dados.");
+              setCacheData(await fresh.json());
+              setLastSync(new Date().toLocaleString("pt-BR"));
+              setSyncMessage("success");
+            } catch (error) {
+              console.error("Erro ao sincronizar ClickUp:", error);
+              alert("Não foi possível sincronizar com o ClickUp.");
+            } finally {
+              setSyncing(false);
+            }
+          }}
+    className="flex items-center gap-2 rounded-xl bg-zinc-950 px-4 py-2.5 text-sm font-medium text-white shadow-sm hover:bg-zinc-800"
+  >
+    <RefreshCw className="h-4 w-4" />
+    Atualizar
+  </button>
+</div>
       </header>
 
       <main className="space-y-6 p-5 lg:p-8">
@@ -624,7 +754,39 @@ export default function PlanejamentoPage() {
                       {(() => {
                         const load = getDayLoad(day.tasks.length);
 
-                        return (
+                        const getCalendarSummary = (dayTasks: any[]) => {
+    const developers = new Map<string, number>();
+    const projects = new Map<string, number>();
+
+    dayTasks.forEach((task: any) => {
+      const responsibles = task.responsible?.length
+        ? task.responsible
+        : ["Sem responsável"];
+
+      responsibles.forEach((name: string) => {
+        developers.set(name, (developers.get(name) || 0) + 1);
+      });
+
+      const project =
+        task.project?.name && task.project.name !== "hidden"
+          ? task.project.name
+          : task.list?.name || "Sem projeto";
+
+      projects.set(project, (projects.get(project) || 0) + 1);
+    });
+
+    return {
+      developers: Array.from(developers.entries())
+        .sort((a, b) => b[1] - a[1])
+        .slice(0, 4),
+      projects: Array.from(projects.entries())
+        .sort((a, b) => b[1] - a[1])
+        .slice(0, 4),
+      totalDevelopers: developers.size,
+      totalProjects: projects.size,
+    };
+  };
+  return (
                           <span
                             className={`inline-flex rounded-full px-2 py-0.5 text-[10px] font-medium ${load.className}`}
                           >
@@ -641,61 +803,62 @@ export default function PlanejamentoPage() {
                         Sem entregas
                       </p>
                     ) : (
-                      day.tasks.map((task: any) => (
-                        <div
-                          key={task.id}
-                          className="rounded-xl border border-zinc-200 bg-zinc-50 p-2.5"
-                        >
-                          <p className="line-clamp-2 text-xs font-semibold leading-4 text-zinc-900">
-                            {task.name || "Sem nome"}
-                          </p>
+                      (() => {
+                        const projects = new Map<string, { count: number; developers: string[] }>();
 
-                          <p className="mt-1 line-clamp-1 text-[10px] text-zinc-500">
-                            {task.project?.name &&
-                            task.project.name !== "hidden"
+                        day.tasks.forEach((task: any) => {
+                          const project =
+                            task.project?.name && task.project.name !== "hidden"
                               ? task.project.name
-                              : task.list?.name || "Sem projeto"}
-                          </p>
+                              : task.list?.name || "Sem projeto";
 
-                          <div className="mt-2 flex flex-wrap gap-1">
-                            <span
-                              className={`rounded-full px-2 py-0.5 text-[10px] font-medium ${
-                                task.projectPriority === "Alta"
-                                  ? "bg-red-100 text-red-700"
-                                  : task.projectPriority === "Média"
-                                    ? "bg-amber-100 text-amber-700"
-                                    : task.projectPriority === "Baixa"
-                                      ? "bg-emerald-100 text-emerald-700"
-                                      : "bg-zinc-200 text-zinc-600"
-                              }`}
-                            >
-                              Projeto: {task.projectPriority}
-                            </span>
+                          if (!projects.has(project)) {
+                            projects.set(project, { count: 0, developers: [] });
+                          }
 
-                            <span
-                              className={`rounded-full px-2 py-0.5 text-[10px] font-medium ${
-                                task.priority === "Alta" ||
-                                task.priority === "Urgente"
-                                  ? "bg-red-100 text-red-700"
-                                  : task.priority === "Normal"
-                                    ? "bg-amber-100 text-amber-700"
-                                    : task.priority === "Baixa"
-                                      ? "bg-emerald-100 text-emerald-700"
-                                      : "bg-zinc-200 text-zinc-600"
-                              }`}
-                            >
-                              Demanda: {task.priority}
-                            </span>
+                          const item = projects.get(project)!;
+                          item.count += 1;
+
+                          const developers = task.responsible?.length
+                            ? task.responsible
+                            : ["Sem responsável"];
+
+                          developers.forEach((developer: string) => {
+                            if (!item.developers.includes(developer)) {
+                              item.developers.push(developer);
+                            }
+                          });
+                        });
+
+                        return (
+                          <div className="space-y-2">
+                            {Array.from(projects.entries()).map(([project, data]) => (
+                              <div
+                                key={project}
+                                className="rounded-xl border border-zinc-200 bg-white p-2.5 shadow-sm"
+                              >
+                                <div className="flex items-start justify-between gap-2">
+                                  <p className="line-clamp-2 text-xs font-semibold leading-4 text-zinc-900">
+                                    {project}
+                                  </p>
+
+                                  <span className="shrink-0 rounded-full bg-zinc-100 px-1.5 py-0.5 text-[9px] font-semibold text-zinc-600">
+                                    {data.count}
+                                  </span>
+                                </div>
+
+                                <p className="mt-2 text-[9px] font-semibold uppercase tracking-wide text-zinc-400">
+                                  Desenvolvedores
+                                </p>
+
+                                <p className="mt-1 line-clamp-2 text-[10px] text-zinc-600">
+                                  {data.developers.join(", ")}
+                                </p>
+                              </div>
+                            ))}
                           </div>
-
-                          <p className="mt-1.5 line-clamp-1 text-[10px] font-medium text-zinc-700">
-                            {task.responsible?.length
-                              ? task.responsible.join(", ")
-                              : "Sem responsável"}
-                          </p>
-                        </div>
-                      ))
-                    )}
+                        );
+                      })()                    )}
                   </div>
                 </div>
               ))}
@@ -889,6 +1052,22 @@ export default function PlanejamentoPage() {
     </div>
   );
 }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 

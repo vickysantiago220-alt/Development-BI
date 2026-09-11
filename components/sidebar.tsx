@@ -13,7 +13,6 @@ import {
   ListTodo,
   Settings,
   Users,
-  Zap,
 } from "lucide-react";
 
 const menuItems = [
@@ -65,21 +64,7 @@ export default function Sidebar() {
   return (
     <aside className="hidden w-64 shrink-0 border-r border-zinc-200 bg-white lg:flex lg:flex-col">
       <div className="flex h-20 items-center border-b border-zinc-100 px-6">
-        <div className="flex items-center gap-3">
-          <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-zinc-950">
-            <Zap className="h-5 w-5 text-white" />
-          </div>
-
-          <div>
-            <p className="text-sm font-bold tracking-tight">
-              DEV MANAGEMENT
-            </p>
-
-            <p className="text-[10px] uppercase tracking-widest text-zinc-400">
-              Development BI
-            </p>
-          </div>
-        </div>
+        <div className="flex items-center"><img src="/dev-management-logo-color.svg" alt="DEV MANAGEMENT" className="h-14 w-auto" /></div>
       </div>
 
       <nav className="flex-1 px-3 py-5">
@@ -151,6 +136,8 @@ export default function Sidebar() {
     </aside>
   );
 }
+
+
 
 
 
