@@ -334,17 +334,37 @@ export async function exportPlanningPptx(data: PlanningData) {
         align: "center",
       });
 
-            const projectGroups = new Map<string, { count: number; developers: string[] }>();
+            const projectGroups = new Map<string, { count: number; developers: string[]; priority: string }>();
 
       dayTasks.forEach((task) => {
         const project = getProjectName(task).trim() || "Sem projeto";
 
         if (!projectGroups.has(project)) {
-          projectGroups.set(project, { count: 0, developers: [] });
+          projectGroups.set(project, {
+            count: 0,
+            developers: [],
+            priority: task.projectPriority || "Não definida",
+          });
         }
 
         const group = projectGroups.get(project)!;
         group.count += 1;
+
+        const priorityRank: Record<string, number> = {
+          Alta: 3,
+          Média: 2,
+          Baixa: 1,
+          "Não definida": 0,
+        };
+
+        const taskPriority = task.projectPriority || "Não definida";
+
+        if (
+          (priorityRank[taskPriority] || 0) >
+          (priorityRank[group.priority] || 0)
+        ) {
+          group.priority = taskPriority;
+        }
 
         const developers = task.responsible?.length
           ? task.responsible
@@ -822,6 +842,27 @@ export async function exportPlanningPdf(data: PlanningData) {
     const tasks = getDayTasks(date);
     const x = startX + index * columnWidth;
 
+    const projectPriorities = tasks
+      .map((task) => task.projectPriority || "Não definida")
+      .filter(Boolean);
+
+    const dayProjectPriority = projectPriorities.includes("Alta")
+      ? "Alta"
+      : projectPriorities.includes("Média")
+        ? "Média"
+        : projectPriorities.includes("Baixa")
+          ? "Baixa"
+          : "Não definida";
+
+    const projectPriorityColor =
+      dayProjectPriority === "Alta"
+        ? red
+        : dayProjectPriority === "Média"
+          ? amber
+          : dayProjectPriority === "Baixa"
+            ? green
+            : "#94A3B8";
+
     const isHigh = tasks.length >= 15;
     const isAttention = tasks.length >= 8 && tasks.length < 15;
 
@@ -879,10 +920,12 @@ export async function exportPlanningPdf(data: PlanningData) {
       { align: "right" }
     );
 
+
     // Número de entregas
     pdf.setFillColor(white);
     pdf.setDrawColor("#E2E8F0");
     pdf.roundedRect(x + 3, startY + 21, 29.5, 28, 3, 3, "FD");
+
 
     pdf.setTextColor(navy);
     pdf.setFont("helvetica", "bold");
@@ -954,17 +997,37 @@ export async function exportPlanningPdf(data: PlanningData) {
       });
     } else {
       // Lista de demandas
-      const projectGroups = new Map<string, { count: number; developers: string[] }>();
+      const projectGroups = new Map<string, { count: number; developers: string[]; priority: string }>();
 
       tasks.forEach((task) => {
         const project = getProjectName(task).trim() || "Sem projeto";
 
         if (!projectGroups.has(project)) {
-          projectGroups.set(project, { count: 0, developers: [] });
+          projectGroups.set(project, {
+            count: 0,
+            developers: [],
+            priority: task.projectPriority || "Não definida",
+          });
         }
 
         const group = projectGroups.get(project)!;
         group.count += 1;
+
+        const priorityRank: Record<string, number> = {
+          Alta: 3,
+          Média: 2,
+          Baixa: 1,
+          "Não definida": 0,
+        };
+
+        const taskPriority = task.projectPriority || "Não definida";
+
+        if (
+          (priorityRank[taskPriority] || 0) >
+          (priorityRank[group.priority] || 0)
+        ) {
+          group.priority = taskPriority;
+        }
 
         const developers = task.responsible?.length
           ? task.responsible
@@ -980,15 +1043,35 @@ export async function exportPlanningPdf(data: PlanningData) {
       let projectY = startY + 72;
 
       Array.from(projectGroups.entries())
-        .slice(0, 4)
+        .sort(([, a], [, b]) => {
+          const rank: Record<string, number> = {
+            Alta: 3,
+            Média: 2,
+            Baixa: 1,
+            "Não definida": 0,
+          };
+
+          return (rank[b.priority] || 0) - (rank[a.priority] || 0);
+        })
+        .slice(0, 2)
         .forEach(([project, group]) => {
-          pdf.setTextColor(navy);
+          const isPriorityProject = group.priority === "Alta";
+
+          if (isPriorityProject) {
+            pdf.setFillColor("#FEE2E2");
+            pdf.roundedRect(x + 4, projectY - 3, 27.5, 13, 2, 2, "F");
+
+            pdf.setFillColor(red);
+            pdf.roundedRect(x + 4, projectY - 3, 1.5, 13, 0.75, 0.75, "F");
+          }
+
+          pdf.setTextColor(isPriorityProject ? red : navy);
           pdf.setFont("helvetica", "bold");
-          pdf.setFontSize(5.2);
+          pdf.setFontSize(isPriorityProject ? 5.4 : 5.2);
 
           const projectLines = pdf.splitTextToSize(
             `${project} (${group.count})`,
-            27
+            25
           );
 
           pdf.text(projectLines.slice(0, 2), x + 7, projectY);
@@ -1022,14 +1105,15 @@ export async function exportPlanningPdf(data: PlanningData) {
           );
         });
 
-      if (projectGroups.size > 4) {
+      if (projectGroups.size > 2) {
         pdf.setTextColor(gray);
         pdf.setFont("helvetica", "italic");
         pdf.setFontSize(4.2);
         pdf.text(
-          `+ ${projectGroups.size - 4} projetos`,
-          x + 7,
-          startY + 120
+          `Detalhamento completo nas páginas seguintes`,
+          x + 17.75,
+          startY + 120,
+          { align: "center" }
         );
       }    }
   });
@@ -1303,6 +1387,17 @@ export async function exportPlanningPdf(data: PlanningData) {
     `Planejamento_Semanal_${formatDate(data.nextWeekStart).replaceAll("/", "-")}.pdf`
   );
 }
+
+
+
+
+
+
+
+
+
+
+
 
 
 
