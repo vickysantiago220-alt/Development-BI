@@ -664,7 +664,7 @@ export async function exportPlanningPdf(data: PlanningData) {
 
     pdf.setTextColor(gray);
     pdf.setFont("helvetica", "normal");
-    pdf.setFontSize(7);
+    pdf.setFontSize(6.5);
     pdf.text(
       "DEV MANAGEMENT BI • Planejamento semanal baseado nos dados sincronizados do ClickUp",
       16,
@@ -812,9 +812,16 @@ export async function exportPlanningPdf(data: PlanningData) {
   pdf.setFont("helvetica", "normal");
   pdf.setFontSize(9);
 
+  // Uma demanda pode estar vinculada a mais de um desenvolvedor.
+  // Contabiliza o total de alocações para diferenciar de demandas únicas.
+  const totalAllocations = developers.reduce(
+    (total, developer) => total + developer.tasks.length,
+    0
+  );
+
   const executiveText = [
-    `• ${planned.length} demandas estão previstas para a próxima semana.`,
-    `• ${developers.length} desenvolvedores possuem demandas planejadas.`,
+    `• ${planned.length} demandas únicas estão previstas para a próxima semana.`,
+    `• ${totalAllocations} alocações estão distribuídas entre ${developers.length} desenvolvedores.`,
     `• ${projects} projetos possuem entregas previstas.`,
     `• ${withoutResponsible} demandas planejadas ainda estão sem responsável.`,
     `• O maior volume concentrado em um único dia é de ${maxDayLoad} entregas.`,
@@ -906,7 +913,7 @@ export async function exportPlanningPdf(data: PlanningData) {
 
     pdf.setTextColor(white);
     pdf.setFont("helvetica", "bold");
-    pdf.setFontSize(7);
+    pdf.setFontSize(6.5);
     pdf.text(weekday, x + 4, startY + 7);
 
     pdf.setTextColor(white);
@@ -1165,7 +1172,7 @@ export async function exportPlanningPdf(data: PlanningData) {
 
     pdf.setTextColor(gray);
     pdf.setFont("helvetica", "normal");
-    pdf.setFontSize(7);
+    pdf.setFontSize(6.5);
     pdf.text("demandas", 258, y + 8);
 
     y += 25;
@@ -1174,6 +1181,13 @@ export async function exportPlanningPdf(data: PlanningData) {
   drawFooter(page);
 
   // DETALHAMENTO POR DESENVOLVEDOR
+  //
+  // Paginação inteligente:
+  // evita deixar o cabeçalho de um desenvolvedor isolado
+  // no final da página.
+
+  let rowY = 34;
+
   developers.forEach((developer) => {
     const developerTasks = planned
       .filter((task) =>
@@ -1187,31 +1201,97 @@ export async function exportPlanningPdf(data: PlanningData) {
         return new Date(a.dueDate).getTime() - new Date(b.dueDate).getTime();
       });
 
-    pdf.addPage();
-    page++;
+    if (developerTasks.length === 0) {
+      return;
+    }
 
-    drawHeader(
+    // Paginação inteligente:
+    // só inicia um novo desenvolvedor em outra página
+    // quando não houver espaço para pelo menos algumas demandas.
+    const minimumRows = Math.min(developerTasks.length, 4);
+    const estimatedHeight = 14 + 9 + (minimumRows * 10) + 5;
+
+    if (rowY + estimatedHeight > 181) {
+      drawFooter(page);
+      pdf.addPage();
+      page++;
+
+      drawHeader(
+        "Detalhamento por desenvolvedor",
+        "Demandas planejadas"
+      );
+
+      rowY = 34;
+    }
+
+    // Cabeçalho compacto do desenvolvedor
+    pdf.setFillColor(navy);
+    pdf.roundedRect(16, rowY, 265, 11, 2, 2, "F");
+
+    pdf.setTextColor(white);
+    pdf.setFont("helvetica", "bold");
+    pdf.setFontSize(9);
+    pdf.text(
       developer.name,
-      `${developerTasks.length} demandas previstas`
+      20,
+      rowY + 7
     );
 
-    pdf.setTextColor(navy);
-    pdf.setFont("helvetica", "bold");
-    pdf.setFontSize(14);
-    pdf.text("Demandas planejadas", 16, 34);
+    pdf.setFont("helvetica", "normal");
+    pdf.setFontSize(7);
+    pdf.text(
+      `${developerTasks.length} demandas`,
+      258,
+      rowY + 7,
+      { align: "right" }
+    );
 
-    let rowY = 44;
+    rowY += 14;
+
+    // Cabeçalho das colunas
+    pdf.setFillColor(light);
+    pdf.setDrawColor(border);
+    pdf.rect(16, rowY, 265, 8, "FD");
+
+    pdf.setTextColor(gray);
+    pdf.setFont("helvetica", "bold");
+    pdf.setFontSize(5.8);
+
+    pdf.text("DEMANDA", 20, rowY + 5);
+    pdf.text("PROJETO", 135, rowY + 5);
+    pdf.text("PRAZO", 199, rowY + 5);
+    pdf.text("PRIORIDADE", 232, rowY + 5);
+
+    rowY += 9;
 
     developerTasks.forEach((task, index) => {
       if (rowY > 181) {
         drawFooter(page);
         pdf.addPage();
         page++;
+
         drawHeader(
           developer.name,
           "Continuação das demandas"
         );
+
         rowY = 34;
+
+        // Cabeçalho das colunas na continuação
+        pdf.setFillColor(light);
+        pdf.setDrawColor(border);
+        pdf.rect(16, rowY, 265, 8, "FD");
+
+        pdf.setTextColor(gray);
+        pdf.setFont("helvetica", "bold");
+        pdf.setFontSize(5.8);
+
+        pdf.text("DEMANDA", 20, rowY + 5);
+        pdf.text("PROJETO", 135, rowY + 5);
+        pdf.text("PRAZO", 199, rowY + 5);
+        pdf.text("PRIORIDADE", 232, rowY + 5);
+
+        rowY += 9;
       }
 
       const demandPriority = task.priority || "Não definida";
@@ -1220,61 +1300,73 @@ export async function exportPlanningPdf(data: PlanningData) {
 
       pdf.setFillColor(index % 2 === 0 ? white : light);
       pdf.setDrawColor(border);
-      pdf.rect(16, rowY - 5, 265, 20, "FD");
+      pdf.rect(16, rowY, 265, 10, "FD");
 
+      // Demanda
       pdf.setTextColor(navy);
       pdf.setFont("helvetica", "bold");
-      pdf.setFontSize(7);
-      const titleLines = pdf.splitTextToSize(
-        `${index + 1}. ${task.name || "Sem nome"}`,
-        112
-      );
-      pdf.text(titleLines.slice(0, 2), 20, rowY + 1);
+      pdf.setFontSize(6.2);
 
+      const title = `${index + 1}. ${task.name || "Sem nome"}`;
+      const titleLines = pdf.splitTextToSize(title, 108);
+
+      pdf.text(
+        titleLines.slice(0, 2),
+        20,
+        rowY + 4
+      );
+
+      // Projeto
       pdf.setTextColor(gray);
       pdf.setFont("helvetica", "normal");
-      pdf.setFontSize(6);
-      pdf.text(project.slice(0, 38), 20, rowY + 10);
+      pdf.setFontSize(5.8);
 
-      pdf.setTextColor(gray);
+      pdf.text(
+        project.slice(0, 30),
+        135,
+        rowY + 6
+      );
+
+      // Prazo
       pdf.text(
         task.dueDate ? formatDate(task.dueDate) : "Sem prazo",
-        139,
-        rowY + 1
+        199,
+        rowY + 6
       );
 
-      pdf.setTextColor(
-        demandPriority === "Alta" ? red :
-        demandPriority === "Normal" ? blue :
-        demandPriority === "Baixa" ? green : gray
-      );
+      // Prioridade
       pdf.setFont("helvetica", "bold");
-      pdf.text(`Demanda: ${demandPriority}`, 177, rowY + 1);
+      pdf.setFontSize(5.5);
+
+      const priorityText =
+        planningPriority === "Prioridade máxima"
+          ? "MÁXIMA"
+          : planningPriority === "Alta atenção"
+          ? "ALTA"
+          : planningPriority === "Planejar"
+          ? "PLANEJAR"
+          : planningPriority.toUpperCase();
 
       pdf.setTextColor(
         planningPriority === "Prioridade máxima" ? red :
         planningPriority === "Alta atenção" ? amber :
-        planningPriority === "Planejar" ? blue : gray
-      );
-      pdf.text(
-        `Planejamento: ${planningPriority}`,
-        177,
-        rowY + 10
+        planningPriority === "Planejar" ? blue :
+        gray
       );
 
-      rowY += 22;
+      pdf.text(
+        priorityText,
+        232,
+        rowY + 6
+      );
+
+      rowY += 10;
     });
 
-    if (developerTasks.length === 0) {
-      pdf.setTextColor(gray);
-      pdf.setFont("helvetica", "normal");
-      pdf.setFontSize(9);
-      pdf.text("Nenhuma demanda planejada.", 20, 50);
-    }
-
-    drawFooter(page);
+    rowY += 5;
   });
 
+  drawFooter(page);
   // SEM RESPONSÁVEL
   const unassigned = planned.filter(
     (task) => !task.responsible?.length
@@ -1310,11 +1402,11 @@ export async function exportPlanningPdf(data: PlanningData) {
 
       pdf.setFillColor(index % 2 === 0 ? white : light);
       pdf.setDrawColor(border);
-      pdf.rect(16, rowY - 5, 265, 19, "FD");
+      pdf.rect(16, rowY - 5, 265, 16, "FD");
 
       pdf.setTextColor(navy);
       pdf.setFont("helvetica", "bold");
-      pdf.setFontSize(7);
+      pdf.setFontSize(6.5);
       pdf.text(
         `${index + 1}. ${(task.name || "Sem nome").slice(0, 72)}`,
         20,
@@ -1332,7 +1424,7 @@ export async function exportPlanningPdf(data: PlanningData) {
         rowY + 5
       );
 
-      rowY += 21;
+      rowY += 18;
     });
 
     drawFooter(page);
@@ -1387,6 +1479,12 @@ export async function exportPlanningPdf(data: PlanningData) {
     `Planejamento_Semanal_${formatDate(data.nextWeekStart).replaceAll("/", "-")}.pdf`
   );
 }
+
+
+
+
+
+
 
 
 
