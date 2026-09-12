@@ -715,7 +715,7 @@ export default function PlanejamentoPage() {
                       </p>
                     ) : (
                       (() => {
-                        const projects = new Map<string, { count: number; developers: string[] }>();
+                        const projects = new Map<string, { count: number; developers: string[]; priority: string }>();
 
                         day.tasks.forEach((task: any) => {
                           const project =
@@ -724,11 +724,18 @@ export default function PlanejamentoPage() {
                               : task.list?.name || "Sem projeto";
 
                           if (!projects.has(project)) {
-                            projects.set(project, { count: 0, developers: [] });
+                            projects.set(project, { count: 0, developers: [], priority: task.projectPriority || "Não definida" });
                           }
 
                           const item = projects.get(project)!;
                           item.count += 1;
+
+                          if (
+                            item.priority === "Não definida" &&
+                            task.projectPriority
+                          ) {
+                            item.priority = task.projectPriority;
+                          }
 
                           const developers = Array.isArray(task.responsible) &&
                             task.responsible.length > 0
@@ -758,14 +765,30 @@ export default function PlanejamentoPage() {
                             {Array.from(projects.entries()).map(([project, data]) => (
                               <div
                                 key={project}
-                                className="rounded-lg border border-zinc-200 bg-white p-2 shadow-sm"
+                                className={`rounded-lg border p-2 shadow-sm ${
+                                   data.priority === "Alta"
+                                     ? "border-red-200 bg-red-50"
+                                     : data.priority === "Média"
+                                       ? "border-orange-200 bg-orange-50"
+                                       : data.priority === "Baixa"
+                                         ? "border-green-200 bg-green-50"
+                                         : "border-zinc-200 bg-white"
+                                 }`}
                               >
                                 <div className="flex items-start justify-between gap-2">
                                   <p className="line-clamp-2 text-xs font-semibold leading-4 text-zinc-900">
                                     {project}
                                   </p>
 
-                                  <span className="shrink-0 rounded-full bg-zinc-100 px-1.5 py-0.5 text-[9px] font-semibold text-zinc-600">
+                                  <span className={`shrink-0 rounded-full px-1.5 py-0.5 text-[9px] font-semibold text-white ${
+                                     data.priority === "Alta"
+                                       ? "bg-red-500"
+                                       : data.priority === "Média"
+                                         ? "bg-orange-500"
+                                         : data.priority === "Baixa"
+                                           ? "bg-green-500"
+                                           : "bg-zinc-500"
+                                   }`}>
                                     {data.count}
                                   </span>
                                 </div>
@@ -1107,6 +1130,7 @@ export default function PlanejamentoPage() {
           )}
         </section>
 
+        {viewMode === "lista" && (
         <div className="flex flex-col gap-3 rounded-2xl border border-zinc-200 bg-white px-5 py-4 shadow-sm sm:flex-row sm:items-center sm:justify-between">
           <p className="text-sm text-zinc-500">
             Mostrando{" "}
@@ -1159,6 +1183,7 @@ export default function PlanejamentoPage() {
             </button>
           </div>
         </div>
+        )}
         <div className="flex items-center gap-2 text-xs text-zinc-500">
           <Clock3 className="h-3.5 w-3.5" />
           O planejamento é uma camada de gestão e não altera o ClickUp automaticamente.
@@ -1167,6 +1192,7 @@ export default function PlanejamentoPage() {
     </div>
   );
 }
+
 
 
 
