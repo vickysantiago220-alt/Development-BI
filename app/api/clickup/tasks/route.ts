@@ -9,6 +9,11 @@ type ClickUpTask = {
   name: string;
   text_content?: string;
   description?: string;
+  creator?: {
+    id: number;
+    username: string;
+    email?: string;
+  };
   status?: {
     status?: string;
     color?: string;
@@ -310,6 +315,14 @@ function normalizeTask(task: ClickUpTask, listMeta?: ClickUpList) {
       task.description ||
       "",
 
+    creator: task.creator
+      ? {
+          id: task.creator.id,
+          name: task.creator.username,
+          email: task.creator.email || null,
+        }
+      : null,
+
     project: {
       id:
         task.folder?.id ||
@@ -318,7 +331,10 @@ function normalizeTask(task: ClickUpTask, listMeta?: ClickUpList) {
         null,
 
       name:
-        task.folder?.name ||
+        listMeta?.folder?.name ||
+        (task.folder?.name && task.folder.name !== "hidden"
+          ? task.folder.name
+          : null) ||
         (task.project?.name &&
         task.project.name !== "hidden"
           ? task.project.name
@@ -617,6 +633,11 @@ export async function GET() {
     );
   }
 }
+
+
+
+
+
 
 
 
