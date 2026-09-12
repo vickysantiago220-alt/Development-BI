@@ -560,25 +560,25 @@ function DashboardContent() {
   const liveMetrics = [
     {
       title: "Projetos ativos",
-      value: String(activeProjects),
+      value: loading ? "—" : String(activeProjects),
       description: "Com demandas em andamento",
       icon: FolderKanban,
     },
     {
       title: "Demandas ativas",
-      value: String(activeTasks.length),
+      value: loading ? "—" : String(activeTasks.length),
       description: "No período selecionado",
       icon: ListTodo,
     },
     {
       title: "Demandas criadas",
-      value: String(createdInPeriod.length),
+      value: loading ? "—" : String(createdInPeriod.length),
       description: "Criadas no período",
       icon: ArrowUpRight,
     },
     {
       title: "Entregues",
-      value: String(completedTasks.length),
+      value: loading ? "—" : String(completedTasks.length),
       description: "Concluídas no período",
       icon: CheckCircle2,
     },
@@ -1347,6 +1347,7 @@ export default function Home() {
     </Suspense>
   );
 }
+
 
 
 
