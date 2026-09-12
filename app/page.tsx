@@ -697,82 +697,29 @@ function DashboardContent() {
       })
     );
 
-  const classifyStatus = (
-    task: any
-  ) => {
-    const status = String(
-      task.status?.name || ""
-    ).trim().toLowerCase();
+  const statusTotals: Record<string, number> = {};
 
-    if (isDone(task)) {
-      return "Concluídas";
-    }
+  periodTasks.forEach((task: any) => {
+    const statusName =
+      String(task.status?.name || "").trim() || "Sem status";
 
-    if (status === "in progress") {
-      return "Em desenvolvimento";
-    }
-
-    if (
-      status === "in review" ||
-      status === "qa bug" ||
-      status === "qa melhoria"
-    ) {
-      return "Em revisão";
-    }
-
-    if (status === "blocked") {
-      return "Bloqueadas";
-    }
-
-    if (
-      status === "open" ||
-      status === "pending/bug" ||
-      status === "pending/melhoria"
-    ) {
-      return "Aguardando";
-    }
-
-    return "Aguardando";
-  };
-
-  const statusTotals =
-    {
-      "Em desenvolvimento": 0,
-      Aguardando: 0,
-      "Em revisão": 0,
-      Bloqueadas: 0,
-      Concluídas: 0,
-    } as Record<string, number>;
-
-  activeTasks.forEach((task: any) => {
-    const category =
-      classifyStatus(task);
-
-    statusTotals[category] += 1;
+    statusTotals[statusName] =
+      (statusTotals[statusName] || 0) + 1;
   });
 
-  statusTotals["Concluídas"] = completedTasks.length;
-
-  const statusTotal =
-    activeTasks.length +
-    completedTasks.length;
+  const statusTotal = periodTasks.length;
 
   const liveStatusData =
-    Object.entries(
-      statusTotals
-    ).map(
-      ([label, value]) => ({
+    Object.entries(statusTotals)
+      .sort(([, a], [, b]) => b - a)
+      .map(([label, value]) => ({
         label,
         value,
         percentage: statusTotal
-          ? Math.round(
-              (value /
-                statusTotal) *
-                100
-            )
+          ? Math.round((value / statusTotal) * 100)
           : 0,
-      })
-    );
+      }));
+
   const formatDeliveryDate = (
     date: Date
   ) => {
@@ -965,7 +912,7 @@ function DashboardContent() {
 
               <Attention
                 color="bg-amber-500"
-                title={`${statusTotals["Bloqueadas"]} demandas bloqueadas`}
+                title={`${periodTasks.filter((task: any) => String(task.status?.name || "").trim().toLowerCase() === "blocked").length} demandas bloqueadas`}
                 description="Demandas que dependem de alguma ação externa."
               />
             </div>
@@ -1347,6 +1294,8 @@ export default function Home() {
     </Suspense>
   );
 }
+
+
 
 
 
