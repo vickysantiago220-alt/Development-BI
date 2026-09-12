@@ -13,6 +13,7 @@ type Task = {
   project?: {
     id?: string;
     name?: string;
+    color?: string | null;
   };
   list?: {
     id?: string;
@@ -29,8 +30,13 @@ type Task = {
   };
 };
 
+function getProjectColor(color?: string | null) {
+  return color || "#71717a";
+}
+
 type Project = {
   name: string;
+  color: string | null;
   total: number;
   completed: number;
   active: number;
@@ -251,6 +257,9 @@ export default function ProjetosPage() {
 
         return {
           name,
+          color:
+            projectTasks.find((task) => task.project?.color)?.project?.color ||
+            null,
           total,
           completed,
           active,
@@ -411,12 +420,12 @@ export default function ProjetosPage() {
                       window.location.href = `/projetos/${encodeURIComponent(project.name)}`;
                     }
                   }}
-                  className="cursor-pointer rounded-2xl border border-zinc-200 p-5 transition-shadow hover:shadow-md"
+                  className="cursor-pointer rounded-2xl border-2 p-5 transition-shadow hover:shadow-md" style={{ borderColor: getProjectColor(project.color) }}
                 >
                   <div className="flex items-start justify-between">
                     <div className="flex items-center gap-3">
-                      <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-zinc-100">
-                        <FolderKanban className="h-5 w-5 text-zinc-700" />
+                      <div className="flex h-10 w-10 items-center justify-center rounded-xl" style={{ backgroundColor: `${getProjectColor(project.color)}20` }}>
+                        <FolderKanban className="h-5 w-5" style={{ color: getProjectColor(project.color) }} />
                       </div>
 
                       <div className="min-w-0">
@@ -457,8 +466,8 @@ export default function ProjetosPage() {
 
                     <div className="h-2 overflow-hidden rounded-full bg-zinc-100">
                       <div
-                        className="h-full rounded-full bg-zinc-900"
-                        style={{ width: `${project.progress}%` }}
+                        className="h-full rounded-full" style={{ width: `${project.progress}%`, backgroundColor: getProjectColor(project.color) }}
+                        
                       />
                     </div>
                   </div>
@@ -561,6 +570,14 @@ function Metric({
     </div>
   );
 }
+
+
+
+
+
+
+
+
 
 
 

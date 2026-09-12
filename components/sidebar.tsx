@@ -27,11 +27,13 @@ const menuItems = [
     href: "/projetos",
     icon: FolderKanban,
   },
+  /*
   {
     label: "Demandas",
     href: "/demandas",
     icon: ListTodo,
   },
+  */
   {
     label: "Equipe",
     href: "/equipe",
@@ -116,6 +118,7 @@ export default function Sidebar() {
     </aside>
   );
 }
+
 
 
 

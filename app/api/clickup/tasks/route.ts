@@ -47,6 +47,7 @@ type ClickUpTask = {
   folder?: {
     id?: string;
     name?: string;
+    color?: string | null;
     hidden?: boolean;
   };
   project?: {
@@ -72,6 +73,7 @@ type ClickUpList = {
   folder?: {
     id?: string;
     name?: string;
+    color?: string | null;
     hidden?: boolean;
   };
 };
@@ -157,6 +159,7 @@ async function getListsFromSpace(
             folder: {
               id: folder.id,
               name: folder.name,
+              color: folder.color || null,
             },
           }))
         );
@@ -341,6 +344,10 @@ function normalizeTask(task: ClickUpTask, listMeta?: ClickUpList) {
           : null) ||
         task.list?.name ||
         "Sem projeto",
+
+      color:
+        listMeta?.folder?.color ||
+        null,
     },
 
     list: {
@@ -633,6 +640,15 @@ export async function GET() {
     );
   }
 }
+
+
+
+
+
+
+
+
+
 
 
 
