@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import "./globals.css";
 import Sidebar from "@/components/sidebar";
+import HideNextDevIndicator from "@/components/hide-next-dev-indicator";
 
 export const metadata: Metadata = {
   title: "DEV MANAGEMENT BI",
@@ -15,6 +16,7 @@ export default function RootLayout({
   return (
     <html lang="pt-BR">
       <body className="bg-[#f7f7f8] text-zinc-950 antialiased">
+        <HideNextDevIndicator />
         <div className="flex min-h-screen">
           <Sidebar />
 
