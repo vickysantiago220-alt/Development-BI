@@ -115,9 +115,11 @@ export default function PlanejamentoPage() {
       .trim()
       .toLowerCase();
 
-    if (
-      ["urgent", "high", "alta", "urgente"].includes(priority)
-    ) {
+    if (["urgent", "urgente"].includes(priority)) {
+      return "Urgente";
+    }
+
+    if (["high", "alta"].includes(priority)) {
       return "Alta";
     }
 
@@ -322,55 +324,53 @@ export default function PlanejamentoPage() {
     };
   }, [tasks]);
 
-  const totalPages = Math.max(
-    1,
-    Math.ceil(
-      planning.tasks.filter(
-        (task: any) => task.planningStatus !== "Sem prazo"
-      ).length / pageSize
-    )
-  );
-
-  const paginatedTasks = planning.tasks
-    .filter(
-      (task: any) => task.planningStatus !== "Sem prazo"
-    )
-    .slice(
-      (currentPage - 1) * pageSize,
-      currentPage * pageSize
-    );
-  const paginatedDevelopers = useMemo(() => {
+  const developerGroups = useMemo(() => {
     const developers = new Map<string, any>();
 
-    paginatedTasks.forEach((task: any) => {
-      if (!task.responsible?.length) {
-        const key = "sem-responsavel";
+    planning.tasks
+      .filter((task: any) => task.planningStatus !== "Sem prazo")
+      .forEach((task: any) => {
+        const responsible =
+          Array.isArray(task.responsible) && task.responsible.length > 0
+            ? task.responsible
+            : ["Sem responsável"];
 
-        const current = developers.get(key) || {
-          name: "Sem responsável",
-          tasks: [],
-        };
+        responsible.forEach((name: any) => {
+          const developerName =
+            typeof name === "string"
+              ? name.trim()
+              : String(
+                  name?.name ||
+                  name?.username ||
+                  name?.email ||
+                  "Sem responsável"
+                ).trim();
 
-        current.tasks.push(task);
-        developers.set(key, current);
-        return;
-      }
+          if (!developers.has(developerName)) {
+            developers.set(developerName, {
+              name: developerName,
+              tasks: [],
+            });
+          }
 
-      task.responsible.forEach((name: string) => {
-        const current = developers.get(name) || {
-          name,
-          tasks: [],
-        };
-
-        current.tasks.push(task);
-        developers.set(name, current);
+          developers.get(developerName).tasks.push(task);
+        });
       });
-    });
 
     return Array.from(developers.values()).sort(
       (a, b) => b.tasks.length - a.tasks.length
     );
-  }, [paginatedTasks]);
+  }, [planning.tasks]);
+
+  const totalPages = Math.max(
+    1,
+    Math.ceil(developerGroups.length / pageSize)
+  );
+
+  const paginatedDevelopers = developerGroups.slice(
+    (currentPage - 1) * pageSize,
+    currentPage * pageSize
+  );
   const calendarDays = useMemo(() => {
     return Array.from({ length: 7 }, (_, index) => {
       const date = new Date(planning.nextWeekStart);
@@ -799,119 +799,311 @@ export default function PlanejamentoPage() {
               </p>
             </div>
           ) : (
-            paginatedDevelopers.map((developer: any) => (
-              <div
-                key={developer.name}
-                className="overflow-hidden rounded-xl border border-zinc-200 bg-white shadow-sm"
-              >
-                <div className="flex items-center justify-between border-b border-zinc-200 px-4 py-3">
-                  <div>
-                    <h3 className="font-semibold">
-                      {developer.name}
-                    </h3>
+            paginatedDevelopers.map((developer: any) => {
+              const priorityGroups = [
+                {
+                  key: "urgente",
+                  label: "Urgente",
+                  className: "bg-red-500",
+                  textClass: "text-white",
+                  match: (task: any) => task.priority === "Urgente",
+                },
+                {
+                  key: "alta",
+                  label: "Alta",
+                  className: "bg-yellow-400",
+                  textClass: "text-zinc-800",
+                  match: (task: any) => task.priority === "Alta",
+                },
+                {
+                  key: "normal",
+                  label: "Normal",
+                  className: "bg-blue-500",
+                  textClass: "text-white",
+                  match: (task: any) => task.priority === "Normal",
+                },
+                {
+                  key: "baixa",
+                  label: "Baixa",
+                  className: "bg-zinc-300",
+                  textClass: "text-zinc-700",
+                  match: (task: any) => task.priority === "Baixa",
+                },
+              ];
 
-                    <p className="mt-0.5 text-[11px] text-zinc-500">
-                      {developer.tasks.length} demanda
-                      {developer.tasks.length === 1 ? "" : "s"}
-                    </p>
-                  </div>
+              const counts = priorityGroups.map((group) =>
+                developer.tasks.filter(group.match).length
+              );
 
-                  <div className="flex h-9 w-9 items-center justify-center rounded-full bg-zinc-100">
-                    {developer.name === "Sem responsável" ? (
-                      <AlertTriangle className="h-4 w-4 text-zinc-500" />
-                    ) : (
-                      <CheckCircle2 className="h-4 w-4 text-zinc-600" />
-                    )}
-                  </div>
-                </div>
+              const classified = counts.reduce((sum, value) => sum + value, 0);
+              const completed = Math.max(
+                0,
+                developer.tasks.length - classified
+              );
 
-                <div className="divide-y divide-zinc-100">
-                  {developer.tasks.map((task: any) => (
-                    <div
-                      key={`${developer.name}-${task.id}`}
-                      className="grid gap-3 px-4 py-2.5 lg:grid-cols-[2fr_1fr_0.8fr_0.9fr_0.9fr] items-center"
-                    >
-                      <div className="min-w-0">
-                        <p className="truncate text-[13px] font-medium text-zinc-900">
-                          {task.name || "Sem nome"}
-                        </p>
+              const projectMap = new Map<
+                string,
+                {
+                  count: number;
+                  dates: number[];
+                  priority: string;
+                }
+              >();
 
-                        <p className="mt-0.5 truncate text-[11px] text-zinc-500">
-                          {task.project?.name &&
-                          task.project.name !== "hidden"
-                            ? task.project.name
-                            : task.list?.name || "Sem projeto"}
-                        </p>
+              developer.tasks.forEach((task: any) => {
+                const project =
+                  task.project?.name &&
+                  task.project.name !== "hidden"
+                    ? task.project.name
+                    : task.list?.name || "Sem projeto";
+
+                if (!projectMap.has(project)) {
+                  projectMap.set(project, {
+                    count: 0,
+                    dates: [],
+                    priority: task.projectPriority || "Não definida",
+                  });
+                }
+
+                const item = projectMap.get(project)!;
+                item.count += 1;
+
+                if (
+                  item.priority === "Não definida" &&
+                  task.projectPriority
+                ) {
+                  item.priority = task.projectPriority;
+                }
+
+                if (task.dueDate) {
+                  const timestamp = new Date(task.dueDate).getTime();
+
+                  if (!Number.isNaN(timestamp)) {
+                    item.dates.push(timestamp);
+                  }
+                }
+              });
+
+              const projects = Array.from(projectMap.entries())
+                .map(([name, data]) => ({
+                  name,
+                  count: data.count,
+                  priority: data.priority,
+                  minDate:
+                    data.dates.length > 0
+                      ? Math.min(...data.dates)
+                      : null,
+                  maxDate:
+                    data.dates.length > 0
+                      ? Math.max(...data.dates)
+                      : null,
+                }))
+                .sort((a, b) => b.count - a.count);
+
+              const visibleProjects = projects.slice(0, 7);
+              const remainingProjects = projects.slice(7);
+              const remainingCount = remainingProjects.reduce(
+                (sum, project) => sum + project.count,
+                0
+              );
+
+              const total = developer.tasks.length || 1;
+
+              return (
+                <div
+                  key={developer.name}
+                  className="overflow-hidden rounded-xl border border-zinc-200 bg-white shadow-sm"
+                >
+                  <div className="grid gap-4 px-4 py-3 lg:grid-cols-[240px_minmax(0,1fr)_130px] lg:items-center">
+                    <div className="min-w-0">
+                      <h3 className="truncate text-base font-semibold text-zinc-900">
+                        {developer.name}
+                      </h3>
+
+                      <p className="mt-1 text-[11px] text-zinc-500">
+                        Principais projetos: {projects.length}
+                      </p>
+                    </div>
+
+                    <div className="min-w-0">
+                      <div className="flex h-7 overflow-hidden rounded-md bg-zinc-100">
+                        {priorityGroups.map((group, index) => {
+                          const count = counts[index];
+
+                          if (!count) return null;
+
+                          return (
+                            <div
+                              key={group.key}
+                              className={`${group.className} ${group.textClass} flex min-w-[34px] items-center justify-center text-[11px] font-semibold`}
+                              style={{
+                                width: `${(count / total) * 100}%`,
+                              }}
+                              title={`${group.label}: ${count}`}
+                            >
+                              {count}
+                            </div>
+                          );
+                        })}
+
                       </div>
 
-                      <div>
-                        <p className="text-[9px] uppercase tracking-wide text-zinc-400">
-                          Status
-                        </p>
+                      <div className="mt-1.5 hidden items-center gap-3 text-[9px] text-zinc-400 sm:flex">
+                        {priorityGroups.map((group) => (
+                          <span
+                            key={group.key}
+                            className="flex items-center gap-1"
+                          >
+                            <span
+                              className={`h-2 w-2 rounded-full ${group.className}`}
+                            />
+                            {group.label}
+                          </span>
+                        ))}
 
-                        <span
-                          className={`mt-1 inline-flex rounded-full px-2.5 py-1 text-xs font-medium ${statusStyle(
-                            task.planningStatus
-                          )}`}
-                        >
-                          {task.planningStatus}
-                        </span>
-                      </div>
-
-                      <div>
-                        <p className="text-[9px] uppercase tracking-wide text-zinc-400">
-                          Prazo
-                        </p>
-
-                        <p className="mt-0.5 text-[12px] text-zinc-700">
-                          {formatDate(task.dueDate)}
-                        </p>
-                      </div>
-
-                      <div>
-                        <p className="text-[9px] uppercase tracking-wide text-zinc-400">
-                          Projeto
-                        </p>
-
-                        <p className="mt-0.5 text-[12px] text-zinc-700">
-                          {task.projectPriority}
-                        </p>
-                      </div>
-
-                      <div>
-                        <p className="text-[9px] uppercase tracking-wide text-zinc-400">
-                          Demanda
-                        </p>
-
-                        <p className="mt-0.5 text-[12px] text-zinc-700">
-                          {task.priority}
-                        </p>
-                      </div>
-
-                      <div>
-                        <p className="text-[9px] uppercase tracking-wide text-zinc-400">
-                          Planejamento
-                        </p>
-
-                        <p className="mt-1 text-[13px] font-medium text-zinc-900">
-                          {task.planningPriority}
-                        </p>
-                      </div>
-
-                      <div>
-                        <p className="text-[9px] uppercase tracking-wide text-zinc-400">
-                          Ação
-                        </p>
-
-                        <button className="mt-1 text-sm font-medium text-zinc-700 hover:text-zinc-950">
-                          Analisar
-                        </button>
                       </div>
                     </div>
-                  ))}
+
+                    <div className="text-left lg:text-right">
+                      <p className="text-xl font-semibold tracking-tight text-zinc-900">
+                        {developer.tasks.length}
+                      </p>
+
+                      <p className="text-[11px] text-zinc-500">
+                        demanda{developer.tasks.length === 1 ? "" : "s"}
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="border-t border-zinc-100 bg-zinc-50/60 px-4 py-3">
+                    <div className="flex flex-wrap gap-2">
+
+                      {visibleProjects.map((project) => {
+                        const projectStyle =
+                          project.priority === "Alta"
+                            ? {
+                                card: "border-red-200 bg-red-50",
+                                badge: "bg-red-500",
+                              }
+                            : project.priority === "Média"
+                              ? {
+                                  card: "border-orange-200 bg-orange-50",
+                                  badge: "bg-orange-500",
+                                }
+                              : project.priority === "Baixa"
+                                ? {
+                                    card: "border-green-200 bg-green-50",
+                                    badge: "bg-green-500",
+                                  }
+                                : {
+                                    card: "border-zinc-200 bg-white",
+                                    badge: "bg-zinc-500",
+                                  };
+
+                        return (
+                          <div
+                            key={project.name}
+                            title={`Prioridade do projeto: ${project.priority}`}
+                            className={`min-w-[180px] flex-1 rounded-lg border px-3 py-2 shadow-sm ${projectStyle.card}`}
+                          >
+                            <div className="flex items-start justify-between gap-2">
+                              <p className="line-clamp-2 text-xs font-semibold leading-4 text-zinc-900">
+                                {project.name}
+                              </p>
+
+                              <span
+                                className={`shrink-0 rounded-md px-1.5 py-0.5 text-[10px] font-semibold text-white ${projectStyle.badge}`}
+                              >
+                                {project.count}
+                              </span>
+                            </div>
+
+                            <p className="mt-1 text-[10px] text-zinc-500">
+                              {project.minDate && project.maxDate
+                                ? `${formatDate(
+                                    new Date(project.minDate)
+                                  )} – ${formatDate(
+                                    new Date(project.maxDate)
+                                  )}`
+                                : "Sem prazo definido"}
+                            </p>
+                          </div>
+                        );
+                      })}
+
+                      {remainingProjects.length > 0 && (
+                        <div className="group relative min-w-[150px] flex-1 rounded-lg border border-zinc-200 bg-white px-3 py-2 shadow-sm">
+                          <div className="flex items-start justify-between gap-2">
+                            <p className="text-xs font-semibold leading-4 text-zinc-900">
+                              Demais projetos
+                            </p>
+
+                            <span className="shrink-0 rounded-md bg-slate-200 px-1.5 py-0.5 text-[10px] font-semibold text-slate-600">
+                              {remainingCount}
+                            </span>
+                          </div>
+
+                          <p className="mt-1 text-[10px] text-zinc-500">
+                            {remainingProjects.length} projeto
+                            {remainingProjects.length === 1 ? "" : "s"}
+                          </p>
+
+                          <div className="pointer-events-none absolute bottom-full left-1/2 z-50 mb-2 hidden w-72 -translate-x-1/2 rounded-lg bg-zinc-900 px-3 py-2 text-left text-[11px] text-white shadow-xl group-hover:block">
+                            <p className="mb-2 font-semibold text-white">
+                              Projetos restantes
+                            </p>
+
+                            <div className="space-y-1.5">
+                              {remainingProjects.map((project) => (
+                                <div
+                                  key={project.name}
+                                  className="flex items-center justify-between gap-3"
+                                >
+                                  <span className="min-w-0 truncate">
+                                    {project.name}
+                                  </span>
+
+                                  <span className="shrink-0 text-zinc-300">
+                                    {project.count}{" "}
+                                    {project.count === 1
+                                      ? "demanda"
+                                      : "demandas"}
+                                  </span>
+                                </div>
+                              ))}
+                            </div>
+
+                          </div>
+                        </div>
+                      )}
+                    </div>
+
+
+                    <div className="mt-3 flex w-full flex-wrap items-center justify-center gap-x-4 gap-y-1 border-t border-zinc-100 pt-3 text-[10px] text-zinc-500">
+                      <span className="font-medium text-zinc-600">
+                        Prioridade dos projetos:
+                      </span>
+                      <span className="flex items-center gap-1">
+                        <span className="h-2 w-2 rounded-full bg-red-500" />
+                        Alta
+                      </span>
+                      <span className="flex items-center gap-1">
+                        <span className="h-2 w-2 rounded-full bg-orange-500" />
+                        Média
+                      </span>
+                      <span className="flex items-center gap-1">
+                        <span className="h-2 w-2 rounded-full bg-green-500" />
+                        Baixa
+                      </span>
+                      <span className="flex items-center gap-1">
+                        <span className="h-2 w-2 rounded-full bg-zinc-300" />
+                        Não definida
+                      </span>
+                    </div>
+                  </div>
                 </div>
-              </div>
-            ))
+              );
+            })
           )}
         </section>
 
@@ -975,4 +1167,8 @@ export default function PlanejamentoPage() {
     </div>
   );
 }
+
+
+
+
 
