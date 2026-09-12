@@ -1,12 +1,50 @@
 "use client";
 
-import { useState } from "react";
-import { RefreshCw, CheckCircle2, AlertTriangle } from "lucide-react";
+import { useEffect, useState } from "react";
+import {
+  RefreshCw,
+  CheckCircle2,
+  AlertTriangle,
+} from "lucide-react";
 
 export default function ClickUpSync() {
   const [syncing, setSyncing] = useState(false);
-  const [status, setStatus] = useState<"idle" | "success" | "error">("idle");
+  const [status, setStatus] = useState<
+    "idle" | "success" | "error"
+  >("idle");
   const [lastSync, setLastSync] = useState<string | null>(null);
+
+  useEffect(() => {
+    const loadLastSync = async () => {
+      try {
+        const response = await fetch(
+          "/api/clickup/cache",
+          {
+            cache: "no-store",
+          }
+        );
+
+        if (!response.ok) return;
+
+        const data = await response.json();
+
+        if (data?.syncedAt) {
+          setLastSync(
+            new Date(data.syncedAt).toLocaleString(
+              "pt-BR"
+            )
+          );
+        }
+      } catch (error) {
+        console.error(
+          "Erro ao recuperar última sincronização:",
+          error
+        );
+      }
+    };
+
+    loadLastSync();
+  }, []);
 
   const handleSync = async () => {
     if (syncing) return;
@@ -15,29 +53,57 @@ export default function ClickUpSync() {
       setSyncing(true);
       setStatus("idle");
 
-      const response = await fetch("/api/clickup/tasks", {
-        cache: "no-store",
-      });
+      const response = await fetch(
+        "/api/clickup/tasks",
+        {
+          cache: "no-store",
+        }
+      );
 
       if (!response.ok) {
-        throw new Error("Falha ao sincronizar com o ClickUp.");
+        throw new Error(
+          "Falha ao sincronizar com o ClickUp."
+        );
       }
 
-      const fresh = await fetch("/api/clickup/cache", {
-        cache: "no-store",
-      });
+      const fresh = await fetch(
+        "/api/clickup/cache",
+        {
+          cache: "no-store",
+        }
+      );
 
       if (!fresh.ok) {
-        throw new Error("Falha ao atualizar os dados.");
+        throw new Error(
+          "Falha ao atualizar os dados."
+        );
       }
 
-      setLastSync(new Date().toLocaleString("pt-BR"));
+      const data = await fresh.json();
+
+      const syncDate = data?.syncedAt
+        ? new Date(data.syncedAt)
+        : new Date();
+
+      setLastSync(
+        syncDate.toLocaleString("pt-BR")
+      );
+
       setStatus("success");
 
-      window.dispatchEvent(new Event("clickup-synced"));
-      setTimeout(() => window.location.reload(), 800);
+      window.dispatchEvent(
+        new Event("clickup-synced")
+      );
+
+      setTimeout(() => {
+        window.location.reload();
+      }, 800);
     } catch (error) {
-      console.error("Erro ao sincronizar ClickUp:", error);
+      console.error(
+        "Erro ao sincronizar ClickUp:",
+        error
+      );
+
       setStatus("error");
     } finally {
       setSyncing(false);
@@ -57,21 +123,33 @@ export default function ClickUpSync() {
         }`}
       >
         <RefreshCw
-          className={`h-4 w-4 ${syncing ? "animate-spin" : ""}`}
+          className={`h-4 w-4 ${
+            syncing ? "animate-spin" : ""
+          }`}
         />
-        {syncing ? "Sincronizando..." : "Sincronizar ClickUp"}
+
+        {syncing
+          ? "Sincronizando..."
+          : "Sincronizar ClickUp"}
       </button>
+
+      {lastSync && (
+        <div className="mt-2 rounded-lg bg-zinc-50 px-2.5 py-2 text-center text-[11px] text-zinc-500">
+          Última sincronização:{" "}
+          <span className="font-medium text-zinc-700">
+            {lastSync}
+          </span>
+        </div>
+      )}
 
       {status === "success" && (
         <div className="mt-2 flex items-start gap-2 rounded-lg bg-emerald-50 px-2.5 py-2 text-xs text-emerald-700">
           <CheckCircle2 className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+
           <div>
-            <p className="font-medium">Sincronização concluída</p>
-            {lastSync && (
-              <p className="mt-0.5 text-[11px] text-emerald-600">
-                {lastSync}
-              </p>
-            )}
+            <p className="font-medium">
+              Sincronização concluída
+            </p>
           </div>
         </div>
       )}
@@ -79,6 +157,7 @@ export default function ClickUpSync() {
       {status === "error" && (
         <div className="mt-2 flex items-start gap-2 rounded-lg bg-red-50 px-2.5 py-2 text-xs text-red-700">
           <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+
           <p className="font-medium">
             Não foi possível sincronizar. Tente novamente.
           </p>
@@ -87,5 +166,3 @@ export default function ClickUpSync() {
     </div>
   );
 }
-
-

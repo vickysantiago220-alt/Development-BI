@@ -196,6 +196,7 @@ function DashboardContent() {
   };
 
   const [cacheData, setCacheData] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     fetch("/api/clickup/cache", { cache: "no-store" })
@@ -209,7 +210,8 @@ function DashboardContent() {
       .then((data) => setCacheData(data))
       .catch((error) =>
         console.error("Erro ao carregar cache:", error)
-      );
+      )
+      .finally(() => setLoading(false));
   }, []);
 
   const tasks = Array.isArray(cacheData?.tasks)
@@ -1345,6 +1347,8 @@ export default function Home() {
     </Suspense>
   );
 }
+
+
 
 
 
