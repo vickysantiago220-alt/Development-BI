@@ -52,11 +52,13 @@ const menuItems = [
     href: "/roadmap",
     icon: CalendarDays,
   },
+  /*
   {
     label: "Histórico",
     href: "/historico",
     icon: Activity,
   },
+  */
 ];
 
 export default function Sidebar() {
@@ -114,6 +116,7 @@ export default function Sidebar() {
     </aside>
   );
 }
+
 
 
 
