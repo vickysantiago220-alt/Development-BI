@@ -247,10 +247,18 @@ function DashboardContent() {
     return Number.isNaN(date.getTime()) ? null : date;
   };
 
-  const activeTasks = tasks.filter(
-    (task: any) => !isDone(task)
-  );
+  const activeTasks = tasks.filter((task: any) => {
+    if (isDone(task)) return false
 
+    const createdDate = parseDate(task.dates?.createdAt)
+    const dueDate = parseDate(task.dates?.dueDate)
+
+    return (
+      periodType === "all" ||
+      isDateInPeriod(createdDate, period) ||
+      isDateInPeriod(dueDate, period)
+    )
+  })
   const completedTasks = tasks.filter((task: any) => {
     if (!isDone(task)) return false;
 
@@ -267,6 +275,92 @@ function DashboardContent() {
       isDateInPeriod(completedDate, period)
     );
   });
+  const createdInPeriod = tasks.filter((task: any) => {
+    const createdDate = parseDate(task.dates?.createdAt)
+    return isDateInPeriod(createdDate, period)
+  })
+
+  const getTaskTags = (task: any) =>
+    Array.isArray(task.tags)
+      ? task.tags.map((tag: any) =>
+          String(typeof tag === "string" ? tag : tag?.name || "").toLowerCase().trim()
+        )
+      : []
+
+  const hasTag = (task: any, keywords: string[]) => {
+    const tags = getTaskTags(task)
+    return tags.some((tag: string) =>
+      keywords.some((keyword) => tag.includes(keyword))
+    )
+  }
+
+  const bugsInPeriod = periodTasks.filter((task: any) => {
+    const status = String(task.status?.name || "").toLowerCase()
+
+    return (
+      hasTag(task, ["bug", "bugs", "qa-bug"]) ||
+      status.includes("bug")
+    )
+  })
+
+  const improvementsInPeriod = periodTasks.filter((task: any) => {
+    const status = String(task.status?.name || "").toLowerCase()
+
+    return (
+      hasTag(task, ["melhoria", "improvement"]) ||
+      status.includes("melhoria")
+    )
+  })
+
+  const creatorTotals = new Map<string, number>()
+
+  createdInPeriod.forEach((task: any) => {
+    const creatorName = String(
+      task.creator?.name || "Sem criador"
+    ).trim()
+
+    creatorTotals.set(
+      creatorName,
+      (creatorTotals.get(creatorName) || 0) + 1
+    )
+  })
+
+  const projectTotals = new Map<string, number>()
+
+  periodTasks.forEach((task: any) => {
+    const projectName = String(
+      task.project?.name || "Sem projeto"
+    ).trim()
+
+    projectTotals.set(
+      projectName,
+      (projectTotals.get(projectName) || 0) + 1
+    )
+  })
+
+  const priorityTotals = new Map<string, number>()
+
+  periodTasks.forEach((task: any) => {
+    const priority = String(
+      task.priority?.name || "Não definida"
+    ).trim()
+
+    priorityTotals.set(
+      priority,
+      (priorityTotals.get(priority) || 0) + 1
+    )
+  })
+  const creatorData = Array.from(creatorTotals.entries())
+    .map(([name, value]) => ({ name, value }))
+    .sort((a, b) => b.value - a.value)
+
+  const projectData = Array.from(projectTotals.entries())
+    .map(([name, value]) => ({ name, value }))
+    .sort((a, b) => b.value - a.value)
+
+  const priorityData = Array.from(priorityTotals.entries())
+    .map(([name, value]) => ({ name, value }))
+    .sort((a, b) => b.value - a.value)
   const startOfToday = new Date();
 
   startOfToday.setHours(
@@ -460,23 +554,34 @@ function DashboardContent() {
     {
       title: "Demandas ativas",
       value: String(activeTasks.length),
-      description: "Não concluídas no ClickUp",
+      description: "No período selecionado",
       icon: ListTodo,
+    },
+    {
+      title: "Demandas criadas",
+      value: String(createdInPeriod.length),
+      description: "Criadas no período",
+      icon: ArrowUpRight,
     },
     {
       title: "Entregues",
       value: String(completedTasks.length),
-      description: "Total concluídas",
+      description: "Concluídas no período",
       icon: CheckCircle2,
+    },
+    {
+      title: "Bugs",
+      value: String(bugsInPeriod.length),
+      description: "Bugs identificados no período",
+      icon: AlertTriangle,
     },
     {
       title: "Em atraso",
       value: String(overdueTasks.length),
       description: "Prazo vencido e não concluídas",
-      icon: AlertTriangle,
+      icon: Clock3,
     },
   ];
-
   const developerMap = new Map<string, any>();
 
   activeTasks.forEach((task: any) => {
@@ -748,167 +853,12 @@ function DashboardContent() {
 
       <div className="space-y-6 p-5 lg:p-8">
         {/* MÉTRICAS */}
-        <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        <section className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
           {liveMetrics.map((metric) => (
             <MetricCard key={metric.title} {...metric} />
           ))}
         </section>
 
-        {/* PLANEJAMENTO SEMANAL */}
-        <section className="rounded-2xl border border-zinc-200 bg-white p-6 shadow-sm">
-          <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-            <div>
-              <div className="flex items-center gap-2">
-                <CalendarDays className="h-5 w-5 text-zinc-600" />
-                <h2 className="font-semibold">Planejamento da próxima semana</h2>
-              </div>
-
-              <p className="mt-1 text-sm text-zinc-500">
-                Análise das demandas do ClickUp para apoiar a revisão semanal.
-              </p>
-            </div>
-
-            <div className="rounded-xl bg-zinc-50 px-4 py-2 text-sm text-zinc-600">
-              Próxima semana:{" "}
-              <span className="font-semibold text-zinc-900">
-                {nextWeekStart.toLocaleDateString("pt-BR")} –{" "}
-                {nextWeekEnd.toLocaleDateString("pt-BR")}
-              </span>
-            </div>
-          </div>
-
-          <div className="mt-6 grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
-            <div className="rounded-xl border border-zinc-200 bg-zinc-50 p-4">
-              <p className="text-xs font-medium uppercase tracking-wide text-zinc-500">
-                Total
-              </p>
-              <p className="mt-2 text-2xl font-semibold text-zinc-950">
-                {planningSummary.total}
-              </p>
-              <p className="mt-1 text-xs text-zinc-500">
-                Demandas analisadas
-              </p>
-            </div>
-
-            <div className="rounded-xl border border-zinc-200 p-4">
-              <p className="text-xs font-medium uppercase tracking-wide text-zinc-500">
-                Planejadas
-              </p>
-              <p className="mt-2 text-2xl font-semibold text-zinc-700">
-                {planningSummary.planned}
-              </p>
-              <p className="mt-1 text-xs text-zinc-500">
-                Dentro do plano
-              </p>
-            </div>
-
-            <div className="rounded-xl border border-amber-200 bg-amber-50/40 p-4">
-              <p className="text-xs font-medium uppercase tracking-wide text-amber-700">
-                Atenção
-              </p>
-              <p className="mt-2 text-2xl font-semibold text-amber-700">
-                {planningSummary.attention}
-              </p>
-              <p className="mt-1 text-xs text-amber-700/70">
-                Avaliar capacidade
-              </p>
-            </div>
-
-            <div className="rounded-xl border border-red-200 bg-red-50/40 p-4">
-              <p className="text-xs font-medium uppercase tracking-wide text-red-700">
-                Replanejar
-              </p>
-              <p className="mt-2 text-2xl font-semibold text-red-700">
-                {planningSummary.replan}
-              </p>
-              <p className="mt-1 text-xs text-red-700/70">
-                Exigem decisão
-              </p>
-            </div>
-            <div className="rounded-xl border border-zinc-200 bg-zinc-50 p-4">
-              <p className="text-xs font-medium uppercase tracking-wide text-zinc-500">
-                Sem prazo
-              </p>
-              <p className="mt-2 text-2xl font-semibold text-zinc-700">
-                {planningSummary.withoutDate}
-              </p>
-              <p className="mt-1 text-xs text-zinc-500">
-                Precisam de definição
-              </p>
-            </div>
-
-          </div>
-
-          {planningTasks.length > 0 ? (
-            <div className="mt-6 overflow-hidden rounded-xl border border-zinc-200">
-              <div className="grid grid-cols-[1.2fr_2fr_1fr_1fr_1fr] gap-4 border-b border-zinc-200 bg-zinc-50 px-4 py-3 text-xs font-medium uppercase tracking-wide text-zinc-500">
-                <span>Status</span>
-                <span>Demanda</span>
-                <span>Responsável</span>
-                <span>Prazo</span>
-                <span>Prioridade</span>
-              </div>
-
-              {planningTasks.slice(0, 6).map((task: any) => {
-                const statusClass =
-                  task.planningStatus === "Replanejar"
-                    ? "bg-red-100 text-red-700"
-                    : task.planningStatus === "Atenção"
-                      ? "bg-amber-100 text-amber-700"
-                      : "bg-zinc-100 text-zinc-700";
-
-                return (
-                  <div
-                    key={task.id}
-                    className="grid grid-cols-[1.2fr_2fr_1fr_1fr_1fr] gap-4 border-b border-zinc-100 px-4 py-3 text-sm last:border-b-0"
-                  >
-                    <span
-                      className={`w-fit rounded-full px-2.5 py-1 text-xs font-medium ${statusClass}`}
-                    >
-                      {task.planningStatus}
-                    </span>
-
-                    <span className="truncate font-medium text-zinc-900">
-                      {task.name || "Sem nome"}
-                    </span>
-
-                    <span className="truncate text-zinc-500">
-                      {task.responsible?.length
-                        ? task.responsible.join(", ")
-                        : "Sem responsável"}
-                    </span>
-
-                    <span className="text-zinc-600">
-                      {task.dueDate
-                        ? task.dueDate.toLocaleDateString("pt-BR")
-                        : "Sem prazo"}
-                    </span>
-
-                    <span className="text-zinc-600">
-                      {task.priority}
-                    </span>
-                  </div>
-                );
-              })}
-            </div>
-          ) : (
-            <div className="mt-6 rounded-xl border border-dashed border-zinc-300 p-6 text-center">
-              <p className="text-sm font-medium text-zinc-700">
-                Nenhuma demanda identificada para a próxima semana.
-              </p>
-              <p className="mt-1 text-xs text-zinc-500">
-                O planejamento será atualizado conforme as datas do ClickUp.
-              </p>
-            </div>
-          )}
-
-          <div className="mt-4 flex items-center gap-2 text-xs text-zinc-500">
-            <Clock3 className="h-3.5 w-3.5" />
-            <span>
-              Esta análise é uma sugestão de gestão e não altera o ClickUp automaticamente.
-            </span>
-          </div>
-        </section>
         {/* STATUS E ATENÇÃO */}
         <section className="grid gap-6 xl:grid-cols-5">
           <div className="rounded-2xl border border-zinc-200 bg-white p-6 shadow-sm xl:col-span-3">
@@ -970,7 +920,7 @@ function DashboardContent() {
 
               <Attention
                 color="bg-amber-500"
-                title={`${tasks.filter((task: any) => { const priority = String(task.priority?.name || "").toLowerCase(); return !isDone(task) && ["urgent", "high"].includes(priority); }).length} demandas prioritárias`}
+                title={`${activeTasks.filter((task: any) => { const priority = String(task.priority?.name || "").toLowerCase(); return !isDone(task) && ["urgent", "high"].includes(priority); }).length} demandas prioritárias`}
                 description="Demandas de alta prioridade próximas do prazo."
               />
 
@@ -983,6 +933,235 @@ function DashboardContent() {
           </div>
         </section>
 
+        {/* ANÁLISE POR PROJETO */}
+        <section className="rounded-2xl border border-zinc-200 bg-white p-6 shadow-sm">
+          <div className="flex items-center justify-between">
+            <div>
+              <h2 className="font-semibold">Demandas por projeto</h2>
+              <p className="mt-1 text-sm text-zinc-500">
+                Projetos com maior volume de demandas no período
+              </p>
+            </div>
+
+            <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-zinc-100">
+              <FolderKanban className="h-4 w-4 text-zinc-600" />
+            </div>
+          </div>
+
+          <div className="mt-6 space-y-4">
+            {projectData.length === 0 ? (
+              <p className="text-sm text-zinc-500">
+                Nenhuma demanda encontrada no período.
+              </p>
+            ) : (
+              projectData.slice(0, 8).map((item) => {
+                const maxValue = projectData[0]?.value || 1
+                const percentage = Math.round((item.value / maxValue) * 100)
+
+                return (
+                  <div key={item.name}>
+                    <div className="mb-2 flex items-center justify-between gap-4 text-sm">
+                      <span className="truncate font-medium text-zinc-700">
+                        {item.name}
+                      </span>
+                      <span className="shrink-0 font-semibold text-zinc-900">
+                        {item.value}
+                      </span>
+                    </div>
+
+                    <div className="h-2 overflow-hidden rounded-full bg-zinc-100">
+                      <div
+                        className="h-full rounded-full bg-zinc-900 transition-all"
+                        style={{ width: `${percentage}%` }}
+                      />
+                    </div>
+                  </div>
+                )
+              })
+            )}
+          </div>
+        </section>
+        {/* BUGS X MELHORIAS */}
+        <section className="grid gap-6 md:grid-cols-2">
+          <div className="rounded-2xl border border-zinc-200 bg-white p-6 shadow-sm">
+            <div className="flex items-center justify-between">
+              <div>
+                <h2 className="font-semibold">Bugs identificados</h2>
+                <p className="mt-1 text-sm text-zinc-500">
+                  Bugs encontrados no período selecionado
+                </p>
+              </div>
+
+              <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-zinc-100">
+                <AlertTriangle className="h-4 w-4 text-zinc-600" />
+              </div>
+            </div>
+
+            <div className="mt-6 flex items-end justify-between">
+              <span className="text-4xl font-semibold text-zinc-900">
+                {bugsInPeriod.length}
+              </span>
+
+              <span className="text-sm text-zinc-500">
+                demandas
+              </span>
+            </div>
+
+            <div className="mt-5 h-2 overflow-hidden rounded-full bg-zinc-100">
+              <div
+                className="h-full rounded-full bg-zinc-900"
+                style={{
+                  width: `${Math.min(
+                    100,
+                    (bugsInPeriod.length / Math.max(periodTasks.length, 1)) * 100
+                  )}%`,
+                }}
+              />
+            </div>
+          </div>
+
+          <div className="rounded-2xl border border-zinc-200 bg-white p-6 shadow-sm">
+            <div className="flex items-center justify-between">
+              <div>
+                <h2 className="font-semibold">Melhorias identificadas</h2>
+                <p className="mt-1 text-sm text-zinc-500">
+                  Melhorias registradas no período selecionado
+                </p>
+              </div>
+
+              <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-zinc-100">
+                <ArrowUpRight className="h-4 w-4 text-zinc-600" />
+              </div>
+            </div>
+
+            <div className="mt-6 flex items-end justify-between">
+              <span className="text-4xl font-semibold text-zinc-900">
+                {improvementsInPeriod.length}
+              </span>
+
+              <span className="text-sm text-zinc-500">
+                demandas
+              </span>
+            </div>
+
+            <div className="mt-5 h-2 overflow-hidden rounded-full bg-zinc-100">
+              <div
+                className="h-full rounded-full bg-zinc-900"
+                style={{
+                  width: `${Math.min(
+                    100,
+                    (improvementsInPeriod.length / Math.max(periodTasks.length, 1)) * 100
+                  )}%`,
+                }}
+              />
+            </div>
+          </div>
+        </section>
+        {/* DISTRIBUIÇÃO POR PRIORIDADE */}
+        <section className="rounded-2xl border border-zinc-200 bg-white p-6 shadow-sm">
+          <div className="flex items-center justify-between">
+            <div>
+              <h2 className="font-semibold">Distribuição por prioridade</h2>
+              <p className="mt-1 text-sm text-zinc-500">
+                Nível de prioridade das demandas no período selecionado
+              </p>
+            </div>
+
+            <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-zinc-100">
+              <BarChart3 className="h-4 w-4 text-zinc-600" />
+            </div>
+          </div>
+
+          <div className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+            {priorityData.length === 0 ? (
+              <p className="text-sm text-zinc-500">
+                Nenhuma demanda encontrada no período.
+              </p>
+            ) : (
+              priorityData.map((item) => {
+                const total = periodTasks.length || 1
+                const percentage = Math.round((item.value / total) * 100)
+
+                return (
+                  <div
+                    key={item.name}
+                    className="rounded-xl border border-zinc-200 p-4"
+                  >
+                    <div className="flex items-center justify-between gap-3">
+                      <span className="truncate text-sm font-medium text-zinc-600">
+                        {item.name}
+                      </span>
+
+                      <span className="text-xl font-semibold text-zinc-900">
+                        {item.value}
+                      </span>
+                    </div>
+
+                    <div className="mt-3 h-2 overflow-hidden rounded-full bg-zinc-100">
+                      <div
+                        className="h-full rounded-full bg-zinc-900"
+                        style={{ width: `${percentage}%` }}
+                      />
+                    </div>
+
+                    <p className="mt-2 text-xs text-zinc-500">
+                      {percentage}% das demandas
+                    </p>
+                  </div>
+                )
+              })
+            )}
+          </div>
+        </section>
+        {/* DEMANDAS POR CRIADOR */}
+        <section className="rounded-2xl border border-zinc-200 bg-white p-6 shadow-sm">
+          <div className="flex items-center justify-between">
+            <div>
+              <h2 className="font-semibold">Demandas por criador</h2>
+              <p className="mt-1 text-sm text-zinc-500">
+                Quantidade de demandas criadas no período selecionado
+              </p>
+            </div>
+
+            <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-zinc-100">
+              <ListTodo className="h-4 w-4 text-zinc-600" />
+            </div>
+          </div>
+
+          <div className="mt-6 space-y-4">
+            {creatorData.length === 0 ? (
+              <p className="text-sm text-zinc-500">
+                Nenhuma demanda criada no período.
+              </p>
+            ) : (
+              creatorData.slice(0, 8).map((item) => {
+                const maxValue = creatorData[0]?.value || 1
+                const percentage = Math.round((item.value / maxValue) * 100)
+
+                return (
+                  <div key={item.name}>
+                    <div className="mb-2 flex items-center justify-between gap-4 text-sm">
+                      <span className="truncate font-medium text-zinc-700">
+                        {item.name}
+                      </span>
+
+                      <span className="shrink-0 font-semibold text-zinc-900">
+                        {item.value}
+                      </span>
+                    </div>
+
+                    <div className="h-2 overflow-hidden rounded-full bg-zinc-100">
+                      <div
+                        className="h-full rounded-full bg-zinc-900 transition-all"
+                        style={{ width: `${percentage}%` }}
+                      />
+                    </div>
+                  </div>
+                )
+              })
+            )}
+          </div>
+        </section>
         {/* EQUIPE */}
         <section className="rounded-2xl border border-zinc-200 bg-white shadow-sm">
           <div className="flex items-center justify-between border-b border-zinc-100 p-6">
@@ -1129,6 +1308,19 @@ export default function Home() {
     </Suspense>
   );
 }
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
