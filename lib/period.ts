@@ -1,4 +1,4 @@
-export type PeriodType = "all" | "day" | "week" | "month" | "year";
+export type PeriodType = "all" | "day" | "week" | "month" | "year" | "custom";
 
 export type PeriodRange = {
   type: PeriodType;
@@ -54,14 +54,10 @@ export function getPeriodRange(
   }
 
   if (type === "week") {
-    const dayOfWeek = reference.getDay();
-    const daysFromMonday = dayOfWeek === 0 ? 6 : dayOfWeek - 1;
-
     const start = new Date(reference);
-    start.setDate(reference.getDate() - daysFromMonday);
+    start.setDate(reference.getDate() - 6);
 
-    const end = new Date(start);
-    end.setDate(start.getDate() + 6);
+    const end = new Date(reference);
 
     return {
       type,
@@ -72,17 +68,10 @@ export function getPeriodRange(
   }
 
   if (type === "month") {
-    const start = new Date(
-      reference.getFullYear(),
-      reference.getMonth(),
-      1
-    );
+    const start = new Date(reference);
+    start.setDate(reference.getDate() - 29);
 
-    const end = new Date(
-      reference.getFullYear(),
-      reference.getMonth() + 1,
-      0
-    );
+    const end = new Date(reference);
 
     return {
       type,
@@ -92,8 +81,10 @@ export function getPeriodRange(
     };
   }
 
-  const start = new Date(reference.getFullYear(), 0, 1);
-  const end = new Date(reference.getFullYear(), 11, 31);
+  const start = new Date(reference);
+  start.setDate(reference.getDate() - 364);
+
+  const end = new Date(reference);
 
   return {
     type,
@@ -121,9 +112,12 @@ export function getPeriodType(value: string | null): PeriodType {
   if (value === "day") return "day";
   if (value === "month") return "month";
   if (value === "year") return "year";
+  if (value === "custom") return "custom";
 
   return "week";
 }
+
+
 
 
 

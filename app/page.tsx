@@ -177,11 +177,22 @@ function Attention({
 
 function DashboardContent() {
   const router = useRouter();
-  const [periodType, setPeriodType] = useState<"all" | "day" | "week" | "month" | "year">("week");
-  const period = getPeriodRange(periodType);
+  const [periodType, setPeriodType] = useState<"all" | "day" | "week" | "month" | "year" | "custom">("week");
+  const [customStart, setCustomStart] = useState("");
+  const [customEnd, setCustomEnd] = useState("");
+
+  const period =
+    periodType === "custom" && customStart && customEnd
+      ? {
+          type: "custom" as const,
+          start: new Date(`${customStart}T00:00:00`),
+          end: new Date(`${customEnd}T23:59:59.999`),
+          label: `${customStart.split("-").reverse().join("/")} — ${customEnd.split("-").reverse().join("/")}`,
+        }
+      : getPeriodRange(periodType === "custom" ? "week" : periodType);
 
   const changePeriod = (value: string) => {
-    setPeriodType(value as "all" | "day" | "week" | "month" | "year");
+    setPeriodType(value as "all" | "day" | "week" | "month" | "year" | "custom");
   };
 
   const [cacheData, setCacheData] = useState<any>(null);
@@ -836,18 +847,44 @@ function DashboardContent() {
           <h1 className="mt-1 text-xl font-semibold tracking-tight">
             Dashboard Executivo
           </h1>
+          <p className="mt-1 text-xs text-slate-500">
+            Período analisado: <span className="font-medium text-slate-700">{period.label}</span>
+          </p>
         </div>
 
         <div className="flex items-center gap-3">
-          <select value={periodType} onChange={(e) => changePeriod(e.target.value)} className="rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-700 outline-none focus:border-slate-400"><option value="day">Diário</option><option value="week">Semanal</option><option value="month">Mensal</option><option value="year">Anual</option><option value="all">Todos os períodos</option></select>
+          <select value={periodType} onChange={(e) => changePeriod(e.target.value)} className="rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-700 outline-none focus:border-slate-400">
+  <option value="day">Diário</option>
+  <option value="week">Semanal</option>
+  <option value="month">Mensal</option>
+  <option value="year">Anual</option>
+  <option value="custom">Personalizado</option>
+  <option value="all">Todos os períodos</option>
+</select>
 
-          <button className="flex items-center gap-2 rounded-xl bg-zinc-950 px-4 py-2.5 text-sm font-medium text-white shadow-sm hover:bg-zinc-800">
-            <RefreshCw className="h-4 w-4" />
+{periodType === "custom" && (
+  <div className="flex items-center gap-2">
+    <input
+      type="date"
+      value={customStart}
+      onChange={(e) => setCustomStart(e.target.value)}
+      className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 outline-none focus:border-slate-400"
+      aria-label="Data inicial"
+    />
 
-            <span className="hidden sm:inline">
-              Sincronizar ClickUp
-            </span>
-          </button>
+    <span className="text-sm text-slate-400">até</span>
+
+    <input
+      type="date"
+      value={customEnd}
+      onChange={(e) => setCustomEnd(e.target.value)}
+      className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 outline-none focus:border-slate-400"
+      aria-label="Data final"
+    />
+  </div>
+)}
+
+
         </div>
       </header>
 
@@ -1308,6 +1345,12 @@ export default function Home() {
     </Suspense>
   );
 }
+
+
+
+
+
+
 
 
 

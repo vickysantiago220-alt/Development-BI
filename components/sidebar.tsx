@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import ClickUpSync from "@/components/clickup-sync";
 
 import {
   Activity,
@@ -62,13 +63,18 @@ export default function Sidebar() {
   const pathname = usePathname();
 
   return (
-    <aside className="hidden w-64 shrink-0 border-r border-zinc-200 bg-white lg:flex lg:flex-col">
+    <aside className="sticky top-0 hidden h-screen w-64 shrink-0 border-r border-zinc-200 bg-white lg:flex lg:flex-col">
       <div className="flex h-20 items-center border-b border-zinc-100 px-6">
-        <div className="flex items-center"><img src="/dev-management-logo-color.svg" alt="DEV MANAGEMENT" className="h-14 w-auto" /></div>
+        <div className="flex items-center">
+          <img
+            src="/dev-management-logo-color.svg"
+            alt="DEV MANAGEMENT"
+            className="h-14 w-auto"
+          />
+        </div>
       </div>
 
       <nav className="flex-1 px-3 py-5">
-
         <p className="mb-3 px-3 text-[10px] font-semibold uppercase tracking-widest text-zinc-400">
           Gestão
         </p>
@@ -116,6 +122,10 @@ export default function Sidebar() {
         </Link>
       </nav>
 
+      <div className="px-4">
+        <ClickUpSync />
+      </div>
+
       <div className="border-t border-zinc-100 p-4">
         <div className="rounded-xl bg-zinc-50 p-3">
           <div className="flex items-center gap-3">
@@ -136,10 +146,4 @@ export default function Sidebar() {
     </aside>
   );
 }
-
-
-
-
-
-
 

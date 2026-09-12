@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { exportPlanningPdf, exportPlanningPptx } from "@/lib/export-planning";
 import {
-  AlertTriangle, CalendarDays, CheckCircle2, Clock3, RefreshCw, FileDown, Presentation,
+  AlertTriangle, CalendarDays, CheckCircle2, Clock3, FileDown, Presentation,
 } from "lucide-react";
 
 export default function PlanejamentoPage() {
@@ -11,9 +11,6 @@ export default function PlanejamentoPage() {
   const [loading, setLoading] = useState(true);
   const [currentPage, setCurrentPage] = useState(1);
   const [viewMode, setViewMode] = useState<"lista" | "calendario">("lista");
-  const [syncing, setSyncing] = useState(false);
-  const [syncMessage, setSyncMessage] = useState<"idle" | "success" | "error">("idle");
-  const [lastSync, setLastSync] = useState<string | null>(null);
   const pageSize = 10;
 
   useEffect(() => {
@@ -499,39 +496,7 @@ export default function PlanejamentoPage() {
           </p>
         </div>
 
-        <div className="mb-4 space-y-2">
-        {syncMessage === "success" && (
-          <div className="flex items-center gap-3 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800">
-            <CheckCircle2 className="h-5 w-5 shrink-0" />
-            <div>
-              <p className="font-semibold">Sincronização concluída!</p>
-              <p className="text-xs text-emerald-700">Os dados do ClickUp foram atualizados com sucesso.</p>
-            </div>
-          </div>
-        )}
-        {syncMessage === "error" && (
-          <div className="flex items-center gap-3 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">
-            <AlertTriangle className="h-5 w-5 shrink-0" />
-            <div>
-              <p className="font-semibold">Não foi possível sincronizar.</p>
-              <p className="text-xs text-red-700">Verifique a conexão com o ClickUp e tente novamente.</p>
-            </div>
-          </div>
-        )}
-        {syncing && (
-          <div className="flex items-center gap-3 rounded-xl border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-800">
-            <RefreshCw className="h-5 w-5 shrink-0 animate-spin" />
-            <div>
-              <p className="font-semibold">Sincronizando com o ClickUp...</p>
-              <p className="text-xs text-blue-700">Estamos buscando as informações mais recentes. Esse processo pode levar alguns instantes.</p>
-            </div>
-          </div>
-        )}
-        {lastSync && !syncing && (
-          <p className="text-xs text-zinc-500">Última sincronização: <span className="font-semibold text-zinc-700">{lastSync}</span></p>
-        )}
-      </div>
-      <div className="flex flex-wrap items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
   <button
     onClick={() => exportPlanningPdf(planning)}
     className="flex items-center gap-2 rounded-xl border border-zinc-200 bg-white px-4 py-2.5 text-sm font-medium text-zinc-700 shadow-sm hover:bg-zinc-50"
@@ -548,29 +513,7 @@ export default function PlanejamentoPage() {
     PPTX
   </button>
 
-  <button
-    onClick={async () => {
-            try {
-              setSyncing(true);
-              const response = await fetch("/api/clickup/tasks", { cache: "no-store" });
-              if (!response.ok) throw new Error("Falha ao sincronizar com o ClickUp.");
-              const fresh = await fetch("/api/clickup/cache", { cache: "no-store" });
-              if (!fresh.ok) throw new Error("Falha ao atualizar os dados.");
-              setCacheData(await fresh.json());
-              setLastSync(new Date().toLocaleString("pt-BR"));
-              setSyncMessage("success");
-            } catch (error) {
-              console.error("Erro ao sincronizar ClickUp:", error);
-              alert("Não foi possível sincronizar com o ClickUp.");
-            } finally {
-              setSyncing(false);
-            }
-          }}
-    className="flex items-center gap-2 rounded-xl bg-zinc-950 px-4 py-2.5 text-sm font-medium text-white shadow-sm hover:bg-zinc-800"
-  >
-    <RefreshCw className="h-4 w-4" />
-    Atualizar
-  </button>
+
 </div>
       </header>
 
@@ -1032,39 +975,4 @@ export default function PlanejamentoPage() {
     </div>
   );
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
