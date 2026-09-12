@@ -497,6 +497,7 @@ export default function PlanejamentoPage() {
         </div>
 
         <div className="flex flex-wrap items-center gap-2">
+{/*
   <button
     onClick={() => exportPlanningPdf(planning)}
     className="flex items-center gap-2 rounded-xl border border-zinc-200 bg-white px-4 py-2.5 text-sm font-medium text-zinc-700 shadow-sm hover:bg-zinc-50"
@@ -512,6 +513,7 @@ export default function PlanejamentoPage() {
     <Presentation className="h-4 w-4" />
     PPTX
   </button>
+*/}
 
 
 </div>
@@ -1192,6 +1194,8 @@ export default function PlanejamentoPage() {
     </div>
   );
 }
+
+
 
 
 

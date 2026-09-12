@@ -36,6 +36,26 @@ const formatDate = (date: Date | null | undefined) =>
     ? date.toLocaleDateString("pt-BR")
     : "Sem prazo";
 
+
+const getPriorityKey = (priority?: string) => {
+  const value = String(priority || "").trim().toLowerCase();
+
+  if (["urgent", "urgente"].includes(value)) return "Urgente";
+  if (["high", "alta"].includes(value)) return "Alta";
+  if (["normal"].includes(value)) return "Normal";
+  if (["medium", "média", "media"].includes(value)) return "Normal";
+  if (["low", "baixa"].includes(value)) return "Baixa";
+
+  return "Não definida";
+};
+
+const priorityRank = {
+  Urgente: 4,
+  Alta: 3,
+  Normal: 2,
+  Baixa: 1,
+  "Não definida": 0,
+};
 const loadLogo = async () => { const response = await fetch("/dev-management-logo-color.svg"); const svg = await response.text(); const blob = new Blob([svg], { type: "image/svg+xml" }); const url = URL.createObjectURL(blob); return await new Promise<string>((resolve, reject) => { const img = new Image(); img.onload = () => { const canvas = document.createElement("canvas"); canvas.width = img.naturalWidth || 800; canvas.height = img.naturalHeight || 200; const context = canvas.getContext("2d"); if (!context) { URL.revokeObjectURL(url); reject(new Error("Não foi possível preparar a logo.")); return; } context.drawImage(img, 0, 0); URL.revokeObjectURL(url); resolve(canvas.toDataURL("image/png")); }; img.onerror = () => { URL.revokeObjectURL(url); reject(new Error("Não foi possível carregar a logo.")); }; img.src = url; }); };
 
 export async function exportPlanningPptx(data: PlanningData) {
@@ -377,35 +397,156 @@ export async function exportPlanningPptx(data: PlanningData) {
         });
       });
 
+      const projectColors: Record<
+        string,
+        {
+          fill: string;
+          line: string;
+          accent: string;
+          text: string;
+        }
+      > = {
+        Alta: {
+          fill: "FEE2E2",
+          line: "FECACA",
+          accent: "DC2626",
+          text: "991B1B",
+        },
+        Média: {
+          fill: "FFEDD5",
+          line: "FED7AA",
+          accent: "EA580C",
+          text: "9A3412",
+        },
+        Baixa: {
+          fill: "DCFCE7",
+          line: "BBF7D0",
+          accent: "16A34A",
+          text: "166534",
+        },
+        "Não definida": {
+          fill: "FFFFFF",
+          line: "E4E4E7",
+          accent: "71717A",
+          text: "27272A",
+        },
+      };
+
       Array.from(projectGroups.entries())
+        .sort(([, a], [, b]) => {
+          const rank: Record<string, number> = {
+            Alta: 3,
+            Média: 2,
+            Baixa: 1,
+            "Não definida": 0,
+          };
+
+          return (
+            (rank[b.priority] || 0) -
+            (rank[a.priority] || 0)
+          );
+        })
         .slice(0, 4)
         .forEach(([project, group], index) => {
-          const y = 3.35 + index * 0.68;
+          const y = 3.30 + index * 0.68;
 
-          slide.addText(`${project} (${group.count})`, {
-            x: x + 0.12,
-            y,
-            w: 1.32,
-            h: 0.25,
-            fontSize: 7,
+          const style =
+            projectColors[group.priority] ||
+            projectColors["Não definida"];
+
+          slide.addShape(
+            pptx.ShapeType.roundRect,
+            {
+              x: x + 0.08,
+              y: y - 0.04,
+              w: 1.40,
+              h: 0.58,
+              rectRadius: 0.03,
+              fill: {
+                color: style.fill,
+              },
+              line: {
+                color: style.line,
+                width: 0.8,
+              },
+            }
+          );
+
+          slide.addShape(
+            pptx.ShapeType.rect,
+            {
+              x: x + 0.08,
+              y: y - 0.04,
+              w: 0.035,
+              h: 0.58,
+              fill: {
+                color: style.accent,
+              },
+              line: {
+                color: style.accent,
+                transparency: 100,
+              },
+            }
+          );
+
+          slide.addText(project, {
+            x: x + 0.17,
+            y: y + 0.01,
+            w: 0.98,
+            h: 0.18,
+            fontSize: 6.2,
             bold: true,
-            color: navy,
+            color: style.text,
             margin: 0,
             breakLine: false,
+            fit: "shrink",
           });
 
-          slide.addText(group.developers.join(", "), {
-            x: x + 0.12,
-            y: y + 0.25,
-            w: 1.32,
-            h: 0.28,
-            fontSize: 5.5,
-            color: gray,
+          slide.addText(
+            group.developers.join(", "),
+            {
+              x: x + 0.17,
+              y: y + 0.22,
+              w: 0.98,
+              h: 0.18,
+              fontSize: 4.7,
+              color: gray,
+              margin: 0,
+              breakLine: false,
+              fit: "shrink",
+            }
+          );
+
+          slide.addShape(
+            pptx.ShapeType.ellipse,
+            {
+              x: x + 1.17,
+              y: y + 0.12,
+              w: 0.20,
+              h: 0.20,
+              fill: {
+                color: style.accent,
+              },
+              line: {
+                color: style.accent,
+                transparency: 100,
+              },
+            }
+          );
+
+          slide.addText(String(group.count), {
+            x: x + 1.17,
+            y: y + 0.115,
+            w: 0.20,
+            h: 0.20,
+            fontSize: 5.2,
+            bold: true,
+            color: "FFFFFF",
             margin: 0,
-            breakLine: false,
+            align: "center",
+            valign: "middle",
           });
         });
-
       if (dayTasks.length > 6) {
         slide.addText(`+ ${dayTasks.length - 6} demandas`, {
           x: x + 0.12,
@@ -469,21 +610,97 @@ export async function exportPlanningPptx(data: PlanningData) {
         margin: 0,
       });
 
-      const high = developer.tasks.filter(
-        (task) => task.priority === "Alta"
-      ).length;
+      const priorityColors: Record<string, string> = {
+        Urgente: "EF4444",
+        Alta: "FACC15",
+        Normal: "3B82F6",
+        Baixa: "D1D5DB",
+      };
+
+      const priorityKeys = [
+        "Urgente",
+        "Alta",
+        "Normal",
+        "Baixa",
+      ];
+
+      const priorityCounts = priorityKeys.map((key) =>
+        developer.tasks.filter(
+          (task) => getPriorityKey(task.priority) === key
+        ).length
+      );
+
+      const priorityTotal = Math.max(
+        developer.tasks.length,
+        1
+      );
+
+      const priorityBarX = x + 3.55;
+      const priorityBarY = y + 0.28;
+      const priorityBarWidth = 1.85;
+      const priorityBarHeight = 0.22;
+
+      slide.addShape(pptx.ShapeType.roundRect, {
+        x: priorityBarX,
+        y: priorityBarY,
+        w: priorityBarWidth,
+        h: priorityBarHeight,
+        rectRadius: 0.02,
+        fill: { color: "E2E8F0" },
+        line: { color: "E2E8F0", transparency: 100 },
+      });
+
+      let segmentX = priorityBarX;
+
+      priorityKeys.forEach((key, priorityIndex) => {
+        const count = priorityCounts[priorityIndex];
+
+        if (count <= 0) return;
+
+        const segmentWidth =
+          priorityBarWidth * (count / priorityTotal);
+
+        slide.addShape(pptx.ShapeType.rect, {
+          x: segmentX,
+          y: priorityBarY,
+          w: Math.max(segmentWidth, 0.025),
+          h: priorityBarHeight,
+          fill: { color: priorityColors[key] },
+          line: {
+            color: priorityColors[key],
+            transparency: 100,
+          },
+        });
+
+        if (segmentWidth >= 0.22) {
+          slide.addText(String(count), {
+            x: segmentX,
+            y: priorityBarY - 0.01,
+            w: segmentWidth,
+            h: priorityBarHeight,
+            fontSize: 6,
+            bold: true,
+            color: key === "Alta" ? "27272A" : "FFFFFF",
+            margin: 0,
+            align: "center",
+            valign: "middle",
+          });
+        }
+
+        segmentX += segmentWidth;
+      });
 
       slide.addText(
-        high > 0 ? `${high} de alta prioridade` : "Sem alta prioridade",
+        `Urgente ${priorityCounts[0]}   Alta ${priorityCounts[1]}   Normal ${priorityCounts[2]}   Baixa ${priorityCounts[3]}`,
         {
-          x: x + 3.55,
-          y: y + 0.35,
-          w: 1.9,
-          h: 0.25,
-          fontSize: 9,
-          bold: high > 0,
-          color: high > 0 ? red : green,
+          x: priorityBarX,
+          y: y + 0.58,
+          w: priorityBarWidth,
+          h: 0.18,
+          fontSize: 4.7,
+          color: gray,
           margin: 0,
+          fit: "shrink",
           align: "right",
         }
       );
@@ -1062,36 +1279,104 @@ export async function exportPlanningPdf(data: PlanningData) {
         })
         .slice(0, 2)
         .forEach(([project, group]) => {
-          const isPriorityProject = group.priority === "Alta";
+          const projectStyle =
+            group.priority === "Alta"
+              ? {
+                  fill: "#FEE2E2",
+                  line: "#FECACA",
+                  accent: "#DC2626",
+                  text: "#991B1B",
+                }
+              : group.priority === "Média"
+                ? {
+                    fill: "#FFEDD5",
+                    line: "#FED7AA",
+                    accent: "#EA580C",
+                    text: "#9A3412",
+                  }
+                : group.priority === "Baixa"
+                  ? {
+                      fill: "#DCFCE7",
+                      line: "#BBF7D0",
+                      accent: "#16A34A",
+                      text: "#166534",
+                    }
+                  : {
+                      fill: "#FFFFFF",
+                      line: "#E4E4E7",
+                      accent: "#71717A",
+                      text: navy,
+                    };
 
-          if (isPriorityProject) {
-            pdf.setFillColor("#FEE2E2");
-            pdf.roundedRect(x + 4, projectY - 3, 27.5, 13, 2, 2, "F");
+          pdf.setFillColor(projectStyle.fill);
+          pdf.setDrawColor(projectStyle.line);
 
-            pdf.setFillColor(red);
-            pdf.roundedRect(x + 4, projectY - 3, 1.5, 13, 0.75, 0.75, "F");
-          }
-
-          pdf.setTextColor(isPriorityProject ? red : navy);
-          pdf.setFont("helvetica", "bold");
-          pdf.setFontSize(isPriorityProject ? 5.4 : 5.2);
-
-          const projectLines = pdf.splitTextToSize(
-            `${project} (${group.count})`,
-            25
+          pdf.roundedRect(
+            x + 4,
+            projectY - 3,
+            27.5,
+            13,
+            2,
+            2,
+            "FD"
           );
 
-          pdf.text(projectLines.slice(0, 2), x + 7, projectY);
+          pdf.setFillColor(projectStyle.accent);
 
-          const projectHeight = projectLines.length > 1 ? 6 : 3.5;
+          pdf.roundedRect(
+            x + 4,
+            projectY - 3,
+            1.5,
+            13,
+            0.75,
+            0.75,
+            "F"
+          );
+
+          pdf.setTextColor(projectStyle.text);
+          pdf.setFont("helvetica", "bold");
+          pdf.setFontSize(5.2);
+
+          const projectLines = pdf.splitTextToSize(
+            project,
+            21
+          );
+
+          pdf.text(
+            projectLines.slice(0, 2),
+            x + 7,
+            projectY
+          );
+
+          pdf.setFillColor(projectStyle.accent);
+          pdf.circle(
+            x + 29,
+            projectY + 2,
+            1.8,
+            "F"
+          );
+
+          pdf.setTextColor("#FFFFFF");
+          pdf.setFont("helvetica", "bold");
+          pdf.setFontSize(4.8);
+
+          pdf.text(
+            String(group.count),
+            x + 29,
+            projectY + 3.7,
+            { align: "center" }
+          );
+
+          const projectHeight =
+            projectLines.length > 1 ? 6 : 3.5;
 
           pdf.setTextColor(gray);
           pdf.setFont("helvetica", "normal");
-          pdf.setFontSize(4.3);
+          pdf.setFontSize(4.1);
 
           const developerLines = pdf.splitTextToSize(
             group.developers.join(", "),
-            27
+            24
           );
 
           pdf.text(
@@ -1104,13 +1389,13 @@ export async function exportPlanningPdf(data: PlanningData) {
 
           pdf.setDrawColor("#E2E8F0");
           pdf.setLineWidth(0.25);
+
           pdf.line(
             x + 4,
             projectY - 4,
             x + columnWidth - 4,
             projectY - 4
-          );
-        });
+          );        });
 
       if (projectGroups.size > 2) {
         pdf.setTextColor(gray);
@@ -1175,7 +1460,90 @@ export async function exportPlanningPdf(data: PlanningData) {
     pdf.setFontSize(6.5);
     pdf.text("demandas", 258, y + 8);
 
-    y += 25;
+    const priorityCounts = {
+      Urgente: developerTasks.filter(
+        (task) => getPriorityKey(task.priority) === "Urgente"
+      ).length,
+      Alta: developerTasks.filter(
+        (task) => getPriorityKey(task.priority) === "Alta"
+      ).length,
+      Normal: developerTasks.filter(
+        (task) => getPriorityKey(task.priority) === "Normal"
+      ).length,
+      Baixa: developerTasks.filter(
+        (task) => getPriorityKey(task.priority) === "Baixa"
+      ).length,
+    };
+
+    const priorityTotal =
+      priorityCounts.Urgente +
+      priorityCounts.Alta +
+      priorityCounts.Normal +
+      priorityCounts.Baixa;
+
+    const barX = 23;
+    const barY = y + 12;
+    const barWidth = 225;
+    const barHeight = 3;
+
+    pdf.setFillColor("#E2E8F0");
+
+    pdf.roundedRect(
+      barX,
+      barY,
+      barWidth,
+      barHeight,
+      1.5,
+      1.5,
+      "F"
+    );
+
+    if (priorityTotal > 0) {
+      const segments = [
+        { key: "Urgente", color: "#EF4444" },
+        { key: "Alta", color: "#FACC15" },
+        { key: "Normal", color: "#3B82F6" },
+        { key: "Baixa", color: "#D1D5DB" },
+      ];
+
+      let segmentX = barX;
+
+      segments.forEach((segment) => {
+        const count =
+          priorityCounts[
+            segment.key as keyof typeof priorityCounts
+          ];
+
+        if (count <= 0) return;
+
+        const width =
+          barWidth * (count / priorityTotal);
+
+        pdf.setFillColor(segment.color);
+
+        pdf.rect(
+          segmentX,
+          barY,
+          width,
+          barHeight,
+          "F"
+        );
+
+        segmentX += width;
+      });
+    }
+
+    pdf.setTextColor(gray);
+    pdf.setFont("helvetica", "normal");
+    pdf.setFontSize(4.8);
+
+    pdf.text(
+      `Urgente ${priorityCounts.Urgente}   Alta ${priorityCounts.Alta}   Normal ${priorityCounts.Normal}   Baixa ${priorityCounts.Baixa}`,
+      23,
+      y + 18
+    );
+
+    y += 29;    y += 25;
   });
 
   drawFooter(page);
@@ -1479,6 +1847,12 @@ export async function exportPlanningPdf(data: PlanningData) {
     `Planejamento_Semanal_${formatDate(data.nextWeekStart).replaceAll("/", "-")}.pdf`
   );
 }
+
+
+
+
+
+
 
 
 
