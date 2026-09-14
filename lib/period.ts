@@ -1,4 +1,4 @@
-export type PeriodType = "all" | "day" | "week" | "month" | "year" | "custom";
+export type PeriodType = "all" | "day" | "week" | "next-week" | "month" | "next-month" | "year" | "custom";
 
 export type PeriodRange = {
   type: PeriodType;
@@ -53,11 +53,19 @@ export function getPeriodRange(
     };
   }
 
-  if (type === "week") {
-    const start = new Date(reference);
-    start.setDate(reference.getDate() - 6);
+  if (type === "week" || type === "next-week") {
+    const dayOfWeek = reference.getDay();
+    const daysSinceMonday = dayOfWeek === 0 ? 6 : dayOfWeek - 1;
 
-    const end = new Date(reference);
+    const start = new Date(reference);
+    start.setDate(
+      reference.getDate() -
+        daysSinceMonday +
+        (type === "next-week" ? 7 : 0)
+    );
+
+    const end = new Date(start);
+    end.setDate(start.getDate() + 6);
 
     return {
       type,
@@ -67,11 +75,20 @@ export function getPeriodRange(
     };
   }
 
-  if (type === "month") {
-    const start = new Date(reference);
-    start.setDate(reference.getDate() - 29);
+  if (type === "month" || type === "next-month") {
+    const monthOffset = type === "next-month" ? 1 : 0;
 
-    const end = new Date(reference);
+    const start = new Date(
+      reference.getFullYear(),
+      reference.getMonth() + monthOffset,
+      1
+    );
+
+    const end = new Date(
+      reference.getFullYear(),
+      reference.getMonth() + monthOffset + 1,
+      0
+    );
 
     return {
       type,
@@ -93,7 +110,6 @@ export function getPeriodRange(
     label: `${formatDate(start)} — ${formatDate(end)}`,
   };
 }
-
 export function isDateInPeriod(
   date: string | number | Date | null | undefined,
   period: PeriodRange
@@ -116,6 +132,8 @@ export function getPeriodType(value: string | null): PeriodType {
 
   return "week";
 }
+
+
 
 
 

@@ -177,7 +177,7 @@ function Attention({
 
 function DashboardContent() {
   const router = useRouter();
-  const [periodType, setPeriodType] = useState<"all" | "day" | "week" | "month" | "year" | "custom">("week");
+  const [periodType, setPeriodType] = useState<"day" | "week" | "next-week" | "month" | "next-month" | "custom">("week");
   const [customStart, setCustomStart] = useState("");
   const [customEnd, setCustomEnd] = useState("");
 
@@ -192,7 +192,7 @@ function DashboardContent() {
       : getPeriodRange(periodType === "custom" ? "week" : periodType);
 
   const changePeriod = (value: string) => {
-    setPeriodType(value as "all" | "day" | "week" | "month" | "year" | "custom");
+    setPeriodType(value as "day" | "week" | "next-week" | "month" | "next-month" | "custom");
   };
 
   const [cacheData, setCacheData] = useState<any>(null);
@@ -267,7 +267,6 @@ function DashboardContent() {
     const dueDate = parseDate(task.dates?.dueDate)
 
     return (
-      periodType === "all" ||
       isDateInPeriod(createdDate, period) ||
       isDateInPeriod(dueDate, period)
     )
@@ -1294,6 +1293,10 @@ export default function Home() {
     </Suspense>
   );
 }
+
+
+
+
 
 
 
