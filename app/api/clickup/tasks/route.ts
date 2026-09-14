@@ -554,6 +554,11 @@ export async function GET() {
       tasks: normalizedTasks,
     };
 
+    console.log("INICIANDO PERSISTENCIA MYSQL:", {
+      projects: Array.from(projects.values()).length,
+      tasks: normalizedTasks.length,
+    });
+
     await persistClickUpSnapshot({
       projects: Array.from(projects.values()),
       tasks: normalizedTasks,
@@ -625,18 +630,20 @@ export async function GET() {
       },
     });
   } catch (error) {
-    console.error(
-      "ClickUp integration error:",
-      error
-    );
+    const errorMessage =
+      error instanceof Error
+        ? error.message
+        : typeof error === "string"
+          ? error
+          : JSON.stringify(error);
+
+    console.error("ClickUp integration error:", error);
+    console.error("ClickUp integration error message:", errorMessage);
 
     return NextResponse.json(
       {
         success: false,
-        error:
-          error instanceof Error
-            ? error.message
-            : "Erro desconhecido na integração com o ClickUp.",
+        error: errorMessage || "Erro desconhecido na integração com o ClickUp.",
       },
       { status: 500 }
     );
