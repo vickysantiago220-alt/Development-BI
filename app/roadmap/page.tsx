@@ -23,8 +23,10 @@ type Task = {
   status?: {
     name?: string;
     type?: string;
+    color?: string | null;
   };
   dates?: {
+    startDate?: string | null;
     dueDate?: string | null;
   };
 };
@@ -32,7 +34,17 @@ type Task = {
 type ProjectRoadmap = {
   name: string;
   status: string;
-  weeks: string[];
+  weeks: {
+    status: string;
+    color: string | null;
+  }[];
+  progress: number;
+  totalTasks: number;
+  completedTasks: number;
+  dueDate: string | null;
+  startDate: string | null;
+  timelineStart: string | null;
+  timelineEnd: string | null;
 };
 
 type MilestoneData = {
@@ -65,24 +77,19 @@ const weeks = [
   },
 ];
 
-const legend = [
-  {
-    label: "Em desenvolvimento",
-    className: "bg-zinc-900",
-  },
-  {
-    label: "Planejado",
-    className: "bg-zinc-200",
-  },
-  {
-    label: "Atenção",
-    className: "bg-amber-400",
-  },
-  {
-    label: "Concluído",
-    className: "bg-emerald-500",
-  },
-];
+const legendSymbols: Record<string, string> = {
+  OPEN: "●",
+  HISTORIES: "●",
+  "PENDING/BUG": "●",
+  "PENDING/MELHORIA": "●",
+  "EM PROGRESSO": "◐",
+  "QA BUG": "⚠",
+  "QA MELHORIA": "⚠",
+  "QA REVIEW": "◉",
+  "IN REVIEW": "◆",
+  CLOSED: "✓",
+};
+
 
 function isDone(task: Task) {
   const statusName = String(task.status?.name || "").toLowerCase().trim();
@@ -178,31 +185,29 @@ function parseDueDate(task: Task) {
   return date;
 }
 
-function getWeekIndex(task: Task) {
-  const dueDate = parseDueDate(task);
+function getWeekIndex(
+  task: Task,
+  roadmapWeeks: { start: string; end: string }[]
+) {
+  if (!task.dates?.dueDate) return -1;
 
-  if (!dueDate) {
-    return -1;
-  }
+  const dueDate = new Date(task.dates.dueDate);
+  dueDate.setHours(0, 0, 0, 0);
 
-  const dateOnly = new Date(
-    dueDate.getFullYear(),
-    dueDate.getMonth(),
-    dueDate.getDate()
-  );
+  for (let index = 0; index < roadmapWeeks.length; index++) {
+    const weekStart = new Date(roadmapWeeks[index].start);
+    const weekEnd = new Date(roadmapWeeks[index].end);
 
-  for (let index = 0; index < weeks.length; index += 1) {
-    const start = new Date(`${weeks[index].start}T00:00:00`);
-    const end = new Date(`${weeks[index].end}T23:59:59`);
+    weekStart.setHours(0, 0, 0, 0);
+    weekEnd.setHours(23, 59, 59, 999);
 
-    if (dateOnly >= start && dateOnly <= end) {
+    if (dueDate >= weekStart && dueDate <= weekEnd) {
       return index;
     }
   }
 
   return -1;
 }
-
 function getCellStatus(tasks: Task[]) {
   if (tasks.length === 0) {
     return "empty";
@@ -240,7 +245,6 @@ function getProjectStatus(tasks: Task[]) {
 
   return "Planejado";
 }
-
 function formatDate(date: Date) {
   return date.toLocaleDateString("pt-BR", {
     day: "2-digit",
@@ -251,6 +255,84 @@ function formatDate(date: Date) {
 export default function RoadmapPage() {
   const [tasks, setTasks] = useState<Task[]>([]);
   const [loading, setLoading] = useState(true);
+  const [periodo, setPeriodo] = useState("esta-semana");
+  const [dataInicioPersonalizada, setDataInicioPersonalizada] = useState("");
+  const [dataFimPersonalizada, setDataFimPersonalizada] = useState("");
+
+  const period = useMemo(() => {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    const dayOfWeek = today.getDay();
+    const daysSinceMonday = dayOfWeek === 0 ? 6 : dayOfWeek - 1;
+
+    const startOfWeek = new Date(today);
+    startOfWeek.setDate(today.getDate() - daysSinceMonday);
+
+    const endOfWeek = new Date(startOfWeek);
+    endOfWeek.setDate(startOfWeek.getDate() + 6);
+    endOfWeek.setHours(23, 59, 59, 999);
+
+    const startOfNextWeek = new Date(startOfWeek);
+    startOfNextWeek.setDate(startOfWeek.getDate() + 7);
+
+    const endOfNextWeek = new Date(startOfNextWeek);
+    endOfNextWeek.setDate(startOfNextWeek.getDate() + 6);
+    endOfNextWeek.setHours(23, 59, 59, 999);
+
+    let start = new Date(startOfWeek);
+    let end = new Date(endOfWeek);
+
+    if (periodo === "hoje") {
+      start = new Date(today);
+      end = new Date(today);
+      end.setHours(23, 59, 59, 999);
+    }
+
+    if (periodo === "proxima-semana") {
+      start = new Date(startOfNextWeek);
+      end = new Date(endOfNextWeek);
+    }
+
+    if (periodo === "este-mes") {
+      start = new Date(today.getFullYear(), today.getMonth(), 1);
+      end = new Date(today.getFullYear(), today.getMonth() + 1, 0);
+      end.setHours(23, 59, 59, 999);
+    }
+
+    if (periodo === "proximo-mes") {
+      start = new Date(today.getFullYear(), today.getMonth() + 1, 1);
+      end = new Date(today.getFullYear(), today.getMonth() + 2, 0);
+      end.setHours(23, 59, 59, 999);
+    }
+
+    if (
+      periodo === "personalizado" &&
+      dataInicioPersonalizada &&
+      dataFimPersonalizada
+    ) {
+      const customStart = new Date(
+        `${dataInicioPersonalizada}T00:00:00`
+      );
+      const customEnd = new Date(
+        `${dataFimPersonalizada}T23:59:59`
+      );
+
+      if (
+        !Number.isNaN(customStart.getTime()) &&
+        !Number.isNaN(customEnd.getTime()) &&
+        customEnd >= customStart
+      ) {
+        start = customStart;
+        end = customEnd;
+      }
+    }
+
+    return {
+      start,
+      end,
+    };
+  }, [periodo, dataInicioPersonalizada, dataFimPersonalizada]);
 
   useEffect(() => {
     async function loadRoadmap() {
@@ -274,6 +356,130 @@ export default function RoadmapPage() {
     loadRoadmap();
   }, []);
 
+  const legend = useMemo(() => {
+    const statusMap = new Map<string, string>();
+
+    for (const task of tasks) {
+      const name = task.status?.name?.trim();
+
+      if (!name) continue;
+
+      if (!statusMap.has(name)) {
+        statusMap.set(name, task.status?.color || "#B5B5B5");
+      }
+    }
+
+    const entries = Array.from(statusMap.entries()).map(
+      ([label, color]) => ({
+        label,
+        color,
+        symbol:
+          legendSymbols[label.toUpperCase()] ||
+          (label.toLowerCase().includes("closed") ||
+          label.toLowerCase().includes("conclu")
+            ? "✓"
+            : label.toLowerCase().includes("progress")
+              ? "◐"
+              : label.toLowerCase().includes("review")
+                ? "◆"
+                : label.toLowerCase().includes("qa")
+                  ? "⚠"
+                  : "●"),
+      })
+    );
+
+    return entries.sort((a, b) =>
+      a.label.localeCompare(b.label, "pt-BR")
+    );
+  }, [tasks]);
+  const roadmapWeeks = useMemo(() => {
+    const result: {
+      label: string;
+      start: string;
+      end: string;
+    }[] = [];
+
+    const start = new Date(period.start);
+    const end = new Date(period.end);
+
+    start.setHours(0, 0, 0, 0);
+    end.setHours(23, 59, 59, 999);
+
+    const useDailyView =
+      periodo === "hoje" ||
+      periodo === "esta-semana" ||
+      periodo === "proxima-semana";
+
+    if (useDailyView) {
+      const current = new Date(start);
+
+      while (current <= end) {
+        const dayStart = new Date(current);
+        const dayEnd = new Date(current);
+
+        dayStart.setHours(0, 0, 0, 0);
+        dayEnd.setHours(23, 59, 59, 999);
+
+        result.push({
+          label: `${String(dayStart.getDate()).padStart(2, "0")} ${dayStart
+            .toLocaleDateString("pt-BR", { month: "short" })
+            .replace(".", "")
+            .toUpperCase()}`,
+          start: `${dayStart.getFullYear()}-${String(
+            dayStart.getMonth() + 1
+          ).padStart(2, "0")}-${String(dayStart.getDate()).padStart(2, "0")}`,
+          end: `${dayEnd.getFullYear()}-${String(
+            dayEnd.getMonth() + 1
+          ).padStart(2, "0")}-${String(dayEnd.getDate()).padStart(2, "0")}`,
+        });
+
+        current.setDate(current.getDate() + 1);
+      }
+
+      return result;
+    }
+
+    const current = new Date(start);
+    const dayOfWeek = current.getDay();
+    const daysSinceMonday = dayOfWeek === 0 ? 6 : dayOfWeek - 1;
+
+    current.setDate(current.getDate() - daysSinceMonday);
+    current.setHours(0, 0, 0, 0);
+
+    while (current <= end) {
+      const weekStart = new Date(current);
+      const weekEnd = new Date(current);
+
+      weekEnd.setDate(weekStart.getDate() + 6);
+      weekEnd.setHours(23, 59, 59, 999);
+
+      const visibleStart =
+        weekStart < start ? new Date(start) : weekStart;
+
+      const visibleEnd =
+        weekEnd > end ? new Date(end) : weekEnd;
+
+      result.push({
+        label: `${String(visibleStart.getDate()).padStart(2, "0")} — ${String(
+          visibleEnd.getDate()
+        ).padStart(2, "0")} ${visibleEnd
+          .toLocaleDateString("pt-BR", { month: "short" })
+          .replace(".", "")
+          .toUpperCase()}`,
+        start: `${visibleStart.getFullYear()}-${String(
+          visibleStart.getMonth() + 1
+        ).padStart(2, "0")}-${String(visibleStart.getDate()).padStart(2, "0")}`,
+        end: `${visibleEnd.getFullYear()}-${String(
+          visibleEnd.getMonth() + 1
+        ).padStart(2, "0")}-${String(visibleEnd.getDate()).padStart(2, "0")}`,
+      });
+
+      current.setDate(current.getDate() + 7);
+    }
+
+    return result;
+  }, [period, periodo]);
+
   const projects = useMemo<ProjectRoadmap[]>(() => {
     const grouped = new Map<string, Task[]>();
 
@@ -289,26 +495,100 @@ export default function RoadmapPage() {
 
     return Array.from(grouped.entries())
       .map(([name, projectTasks]) => {
-        const weekStatuses = weeks.map((_, weekIndex) => {
+        const weekStatuses = roadmapWeeks.map((_, weekIndex) => {
           const weekTasks = projectTasks.filter(
-            (task) => getWeekIndex(task) === weekIndex
+            (task) => getWeekIndex(task, roadmapWeeks) === weekIndex
           );
 
-          return getCellStatus(weekTasks);
+          const status = getCellStatus(weekTasks);
+          const color =
+            weekTasks.find((task) => task.status?.color)?.status?.color || null;
+
+          return {
+            status,
+            color,
+          };
         });
+
+        const totalTasks = projectTasks.length;
+        const completedTasks = projectTasks.filter(isDone).length;
+        const progress =
+          totalTasks > 0
+            ? Math.round((completedTasks / totalTasks) * 100)
+            : 0;
+
+        const dueDates = projectTasks
+          .map((task) => parseDueDate(task))
+          .filter((date): date is Date => Boolean(date))
+          .sort((a, b) => a.getTime() - b.getTime());
+
+        const dueDate =
+          dueDates.length > 0
+            ? dueDates[dueDates.length - 1].toISOString()
+            : null;
+
+        const startDates = projectTasks
+          .map((task) => {
+            const value = task.dates?.startDate;
+            if (!value) return null;
+
+            const date = new Date(value);
+            return Number.isNaN(date.getTime()) ? null : date;
+          })
+          .filter((date): date is Date => Boolean(date))
+          .sort((a, b) => a.getTime() - b.getTime());
+
+        const periodDueDates = projectTasks
+          .map((task) => parseDueDate(task))
+          .filter((date): date is Date => {
+            if (!date) return false;
+
+            const periodStart = new Date(period.start);
+            const periodEnd = new Date(period.end);
+
+            periodStart.setHours(0, 0, 0, 0);
+            periodEnd.setHours(23, 59, 59, 999);
+
+            return date >= periodStart && date <= periodEnd;
+          })
+          .sort((a, b) => a.getTime() - b.getTime());
+
+        const timelineStart =
+          periodDueDates.length > 0
+            ? periodDueDates[0].toISOString()
+            : null;
+
+        const timelineEnd =
+          periodDueDates.length > 0
+            ? periodDueDates[periodDueDates.length - 1].toISOString()
+            : null;
+
+        const startDate =
+          startDates.length > 0
+            ? startDates[0].toISOString()
+            : dueDates.length > 0
+              ? dueDates[0].toISOString()
+              : null;
 
         return {
           name,
           status: getProjectStatus(projectTasks),
           weeks: weekStatuses,
+          progress,
+          totalTasks,
+          completedTasks,
+          dueDate,
+          startDate,
+          timelineStart,
+          timelineEnd,
         };
       })
       .filter((project) =>
-        project.weeks.some((status) => status !== "empty")
+        project.weeks.some((week) => week.status !== "empty")
       )
       .sort((a, b) => {
-        const aAttention = a.weeks.includes("attention");
-        const bAttention = b.weeks.includes("attention");
+        const aAttention = a.weeks.some((week) => week.status === "attention");
+        const bAttention = b.weeks.some((week) => week.status === "attention");
 
         if (aAttention !== bAttention) {
           return aAttention ? -1 : 1;
@@ -381,9 +661,51 @@ export default function RoadmapPage() {
     (project) => project.status === "Atenção"
   ).length;
 
-  const completedProjects = projects.filter(
-    (project) => project.status === "Concluído"
-  ).length;
+  const completedProjects = useMemo(() => {
+    const grouped = new Map<string, Task[]>();
+
+    for (const task of tasks) {
+      const project = getProject(task);
+
+      if (project === "Sem projeto") {
+        continue;
+      }
+
+      if (!grouped.has(project)) {
+        grouped.set(project, []);
+      }
+
+      grouped.get(project)!.push(task);
+    }
+
+    return Array.from(grouped.values()).filter((projectTasks) => {
+      if (projectTasks.length === 0) {
+        return false;
+      }
+
+      const allCompleted = projectTasks.every(isDone);
+
+      if (!allCompleted) {
+        return false;
+      }
+
+      return projectTasks.some((task) => {
+        const dueDate = parseDueDate(task);
+
+        if (!dueDate) {
+          return false;
+        }
+
+        const periodStart = new Date(period.start);
+        const periodEnd = new Date(period.end);
+
+        periodStart.setHours(0, 0, 0, 0);
+        periodEnd.setHours(23, 59, 59, 999);
+
+        return dueDate >= periodStart && dueDate <= periodEnd;
+      });
+    }).length;
+  }, [tasks, period]);
 
   return (
     <div className="min-h-screen bg-[#f7f7f8]">
@@ -403,9 +725,49 @@ export default function RoadmapPage() {
             </p>
           </div>
 
-          <div className="flex items-center gap-2 rounded-xl border border-zinc-200 bg-white px-4 py-2.5 text-sm font-medium text-zinc-700 shadow-sm">
-            <CalendarDays className="h-4 w-4 text-zinc-500" />
-            Setembro — Outubro
+          <div className="flex flex-col items-end gap-2">
+            <div className="flex flex-wrap items-center justify-end gap-2">
+              <div className="flex items-center gap-2 rounded-xl border border-zinc-200 bg-white px-3 py-2.5 shadow-sm">
+                <CalendarDays className="h-4 w-4 text-zinc-500" />
+
+                <select
+                  value={periodo}
+                  onChange={(e) => setPeriodo(e.target.value)}
+                  className="bg-transparent text-sm font-medium text-zinc-700 outline-none"
+                >
+                  <option value="hoje">Hoje</option>
+                  <option value="esta-semana">Esta semana</option>
+                  <option value="proxima-semana">Próxima semana</option>
+                  <option value="este-mes">Este mês</option>
+                  <option value="proximo-mes">Próximo mês</option>
+                  <option value="personalizado">Personalizado</option>
+                </select>
+              </div>
+
+              {periodo === "personalizado" && (
+                <>
+                  <input
+                    type="date"
+                    value={dataInicioPersonalizada}
+                    onChange={(e) => setDataInicioPersonalizada(e.target.value)}
+                    className="rounded-xl border border-zinc-200 bg-white px-3 py-2 text-sm text-zinc-700 outline-none focus:border-zinc-400"
+                  />
+
+                  <span className="text-sm text-zinc-400">até</span>
+
+                  <input
+                    type="date"
+                    value={dataFimPersonalizada}
+                    onChange={(e) => setDataFimPersonalizada(e.target.value)}
+                    className="rounded-xl border border-zinc-200 bg-white px-3 py-2 text-sm text-zinc-700 outline-none focus:border-zinc-400"
+                  />
+                </>
+              )}
+            </div>
+
+            <p className="text-sm text-zinc-500">
+              {formatDate(period.start)} – {formatDate(period.end)}
+            </p>
           </div>
         </div>
       </header>
@@ -452,7 +814,7 @@ export default function RoadmapPage() {
                 ? "—"
                 : completedProjects.toLocaleString("pt-BR")
             }
-            description="projetos sem demandas ativas"
+            description="com 100% das demandas concluídas"
             icon={<CheckCircle2 className="h-4 w-4" />}
           />
         </section>
@@ -468,8 +830,11 @@ export default function RoadmapPage() {
               className="flex items-center gap-2 text-xs text-zinc-600"
             >
               <span
-                className={`h-3 w-3 rounded-sm ${item.className}`}
-              />
+                className="flex h-5 w-5 items-center justify-center text-sm font-semibold"
+                style={{ color: item.color }}
+              >
+                {item.symbol}
+              </span>
 
               {item.label}
             </div>
@@ -496,14 +861,14 @@ export default function RoadmapPage() {
           ) : (
             <div className="overflow-x-auto">
               <div className="min-w-[1050px]">
-                <div className="grid grid-cols-[280px_repeat(4,1fr)] border-b border-zinc-200 bg-zinc-50/70">
+                <div className="grid border-b border-zinc-200 bg-zinc-50/70" style={{ gridTemplateColumns: `280px repeat(${roadmapWeeks.length}, minmax(120px, 1fr))` }}>
                   <div className="px-6 py-4">
                     <span className="text-xs font-semibold uppercase tracking-wider text-zinc-400">
                       Projeto
                     </span>
                   </div>
 
-                  {weeks.map((week) => (
+                  {roadmapWeeks.map((week) => (
                     <div
                       key={week.label}
                       className="border-l border-zinc-200 px-4 py-4 text-center"
@@ -518,30 +883,163 @@ export default function RoadmapPage() {
                 {projects.map((project) => (
                   <div
                     key={project.name}
-                    className="grid grid-cols-[280px_repeat(4,1fr)] border-b border-zinc-100 last:border-b-0"
+                    className="grid border-b border-zinc-100 last:border-b-0" style={{ gridTemplateColumns: `280px repeat(${roadmapWeeks.length}, minmax(120px, 1fr))` }}
                   >
-                    <div className="flex items-center gap-3 px-6 py-5">
-                      <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-zinc-100">
-                        <FolderKanban className="h-4 w-4 text-zinc-600" />
-                      </div>
+                    <div className="px-6 py-5">
+                      <div className="flex items-start gap-3">
+                        <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-zinc-100">
+                          <FolderKanban className="h-4 w-4 text-zinc-600" />
+                        </div>
 
-                      <div className="min-w-0">
-                        <p className="truncate text-sm font-semibold">
-                          {project.name}
-                        </p>
+                        <div className="min-w-0 flex-1">
+                          <p className="truncate text-sm font-semibold">
+                            {project.name}
+                          </p>
 
-                        <p className="mt-1 text-xs text-zinc-400">
-                          {project.status}
-                        </p>
+                          <p className="mt-1 text-xs font-medium text-zinc-500">
+                            {project.status}
+                          </p>
+
+                          <div className="mt-3 flex items-center gap-3">
+                            <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-zinc-100">
+                              <div
+                                className="h-full rounded-full bg-zinc-900"
+                                style={{ width: `${project.progress}%` }}
+                              />
+                            </div>
+
+                            <span className="shrink-0 text-xs font-semibold text-zinc-600">
+                              {project.progress}%
+                            </span>
+                          </div>
+
+                          <p className="mt-1.5 text-[11px] text-zinc-400">
+                            {project.completedTasks} de {project.totalTasks} demandas concluídas
+                            {project.dueDate
+                              ? ` · prazo ${new Date(project.dueDate).toLocaleDateString("pt-BR")}`
+                              : ""}
+                          </p>
+                        </div>
                       </div>
                     </div>
 
-                    {project.weeks.map((status, index) => (
-                      <RoadmapCell
-                        key={`${project.name}-${index}`}
-                        status={status}
-                      />
-                    ))}
+                    <div
+                      className="relative border-l border-zinc-100 px-4 py-6"
+                      style={{
+                        gridColumn: `span ${roadmapWeeks.length} / span ${roadmapWeeks.length}`,
+                      }}
+                    >
+                      <div className="relative h-10 overflow-hidden rounded-lg bg-zinc-50">
+                        {roadmapWeeks.map((week) => (
+                          <div
+                            key={week.label}
+                            className="absolute inset-y-0 border-l border-zinc-200/70"
+                            style={{
+                              left: `${
+                                ((new Date(week.start).getTime() -
+                                  new Date(period.start).getTime()) /
+                                  (new Date(period.end).getTime() -
+                                    new Date(period.start).getTime())) *
+                                100
+                              }%`,
+                            }}
+                          />
+                        ))}
+
+                        {(() => {
+                          const position = getTimelinePosition(
+                            project.timelineStart,
+                            project.timelineEnd,
+                            period.start.toISOString(),
+                            period.end.toISOString()
+                          );
+
+                          if (!position) {
+                            return (
+                              <div className="absolute inset-x-0 top-1/2 h-2 -translate-y-1/2 rounded-full bg-zinc-200" />
+                            );
+                          }
+
+                          const projectColor =
+                            [...project.weeks]
+                              .reverse()
+                              .find((week) => week.color)?.color ||
+                            "#18181B";
+
+                          const deliveryPosition = project.timelineEnd
+                            ? getTimelinePosition(
+                                project.timelineEnd,
+                                project.timelineEnd,
+                                period.start.toISOString(),
+                                period.end.toISOString()
+                              )
+                            : null;
+
+                          return (
+                            <>
+                              <div
+                                className="absolute top-1/2 h-3 -translate-y-1/2"
+                                style={{
+                                  left: `${position.left}%`,
+                                  width: `${position.width}%`,
+                                }}
+                              >
+                                {project.weeks.map((week, index) => {
+                                  if (week.status === "empty") return null;
+
+                                  const segmentWidth = 100 / project.weeks.length;
+
+                                  return (
+                                    <div
+                                      key={`${project.name}-${week.status}-${index}`}
+                                      className="absolute top-0 h-3 shadow-sm first:rounded-l-full last:rounded-r-full"
+                                      style={{
+                                        left: `${index * segmentWidth}%`,
+                                        width: `${segmentWidth}%`,
+                                        backgroundColor:
+                                          week.color || "#B5B5B5",
+                                      }}
+                                      title={`${week.status}`}
+                                    />
+                                  );
+                                })}
+                              </div>
+
+                              {deliveryPosition && (
+                                <div
+                                  className="absolute top-1/2 z-10 h-5 w-1 -translate-x-1/2 -translate-y-1/2 rounded-full bg-white shadow-sm ring-2"
+                                  style={{
+                                    left: `${deliveryPosition.left}%`,
+                                    outlineColor: projectColor,
+                                  }}
+                                  title={`Entrega: ${new Date(
+                                    project.timelineEnd!
+                                  ).toLocaleDateString("pt-BR")}`}
+                                />
+                              )}
+                            </>
+                          );
+                        })()}
+                      </div>
+
+                      <div className="mt-2 flex justify-between text-[10px] text-zinc-400">
+                        <span>
+                          {project.timelineStart
+                            ? new Date(project.timelineStart).toLocaleDateString(
+                                "pt-BR"
+                              )
+                            : "Sem entrega no período"}
+                        </span>
+
+                        <span>
+                          {project.timelineEnd
+                            ? new Date(project.timelineEnd).toLocaleDateString(
+                                "pt-BR"
+                              )
+                            : "Sem entrega no período"}
+                        </span>
+                      </div>
+                    </div>
                   </div>
                 ))}
               </div>
@@ -620,41 +1118,89 @@ function Metric({
   );
 }
 
-function RoadmapCell({ status }: { status: string }) {
+function getTimelinePosition(
+  startDate: string | null,
+  dueDate: string | null,
+  periodStart: string,
+  periodEnd: string
+) {
+  if (!startDate && !dueDate) {
+    return null;
+  }
+
+  const start = new Date(startDate || dueDate!);
+  const end = new Date(dueDate || startDate!);
+  const rangeStart = new Date(periodStart);
+  const rangeEnd = new Date(periodEnd);
+
+  if (
+    Number.isNaN(start.getTime()) ||
+    Number.isNaN(end.getTime()) ||
+    Number.isNaN(rangeStart.getTime()) ||
+    Number.isNaN(rangeEnd.getTime())
+  ) {
+    return null;
+  }
+
+  const total = rangeEnd.getTime() - rangeStart.getTime();
+
+  if (total <= 0) {
+    return null;
+  }
+
+  const visibleStart = Math.max(start.getTime(), rangeStart.getTime());
+  const visibleEnd = Math.min(end.getTime(), rangeEnd.getTime());
+
+  if (visibleEnd < rangeStart.getTime() || visibleStart > rangeEnd.getTime()) {
+    return null;
+  }
+
+  const left = ((visibleStart - rangeStart.getTime()) / total) * 100;
+  const right = ((visibleEnd - rangeStart.getTime()) / total) * 100;
+  const width = Math.max(right - left, 2);
+
+  return {
+    left: Math.max(0, Math.min(left, 100)),
+    width: Math.min(width, 100),
+  };
+}
+function RoadmapCell({
+  status,
+  color,
+}: {
+  status: string;
+  color: string | null;
+}) {
   if (status === "empty") {
     return (
-      <div className="border-l border-zinc-100 p-3">
-        <div className="h-12 rounded-lg bg-zinc-50" />
+      <div className="border-l border-zinc-100 px-3 py-4">
+        <div className="h-2 rounded-full bg-zinc-100" />
       </div>
     );
   }
 
   const styles: Record<string, string> = {
-    development: "bg-zinc-900",
-    planned: "bg-zinc-200",
-    attention: "bg-amber-400",
-    completed: "bg-emerald-500",
+    development: "#18181B",
+    planned: "#D4D4D8",
+    attention: "#F59E0B",
+    completed: "#22C55E",
   };
 
+  const backgroundColor = color || styles[status] || "#E4E4E7";
+
   return (
-    <div className="border-l border-zinc-100 p-3">
+    <div className="border-l border-zinc-100 px-3 py-4">
       <div
-        className={`flex h-12 items-center justify-center rounded-lg ${
-          styles[status] || "bg-zinc-100"
-        }`}
+        className="relative h-2 overflow-hidden rounded-full"
+        style={{ backgroundColor }}
       >
         {status === "completed" && (
-          <CheckCircle2 className="h-4 w-4 text-white" />
-        )}
-
-        {status === "attention" && (
-          <AlertTriangle className="h-4 w-4 text-zinc-900" />
+          <div className="absolute inset-y-0 right-0 w-1/3 bg-white/30" />
         )}
       </div>
     </div>
   );
 }
-
 function Milestone({
   project,
   demand,
@@ -698,6 +1244,61 @@ function Milestone({
     </div>
   );
 }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 

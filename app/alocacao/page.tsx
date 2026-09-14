@@ -146,6 +146,9 @@ function getInitials(name: string) {
 export default function AlocacaoPage() {
   const [tasks, setTasks] = useState<Task[]>([]);
   const [loading, setLoading] = useState(true);
+  const [periodo, setPeriodo] = useState("esta-semana");
+  const [dataInicioPersonalizada, setDataInicioPersonalizada] = useState("");
+  const [dataFimPersonalizada, setDataFimPersonalizada] = useState("");
 
   useEffect(() => {
     async function loadAllocation() {
@@ -169,10 +172,96 @@ export default function AlocacaoPage() {
     loadAllocation();
   }, []);
 
-  const activeTasks = useMemo(
-    () => tasks.filter((task) => !isDone(task)),
-    [tasks]
-  );
+  const activeTasks = useMemo(() => {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    const dayOfWeek = today.getDay();
+
+    const startOfWeek = new Date(today);
+    const daysSinceMonday = dayOfWeek === 0 ? 6 : dayOfWeek - 1;
+    startOfWeek.setDate(today.getDate() - daysSinceMonday);
+
+    const endOfWeek = new Date(startOfWeek);
+    endOfWeek.setDate(startOfWeek.getDate() + 6);
+    endOfWeek.setHours(23, 59, 59, 999);
+
+    const startOfNextWeek = new Date(startOfWeek);
+    startOfNextWeek.setDate(startOfWeek.getDate() + 7);
+
+    const endOfNextWeek = new Date(startOfNextWeek);
+    endOfNextWeek.setDate(startOfNextWeek.getDate() + 6);
+    endOfNextWeek.setHours(23, 59, 59, 999);
+
+    let periodStart = new Date(startOfWeek);
+    let periodEnd = new Date(endOfWeek);
+
+    if (periodo === "hoje") {
+      periodStart = new Date(today);
+      periodEnd = new Date(today);
+      periodEnd.setHours(23, 59, 59, 999);
+    }
+
+    if (periodo === "proxima-semana") {
+      periodStart = new Date(startOfNextWeek);
+      periodEnd = new Date(endOfNextWeek);
+    }
+
+    if (periodo === "este-mes") {
+      periodStart = new Date(today.getFullYear(), today.getMonth(), 1);
+      periodEnd = new Date(today.getFullYear(), today.getMonth() + 1, 0);
+      periodEnd.setHours(23, 59, 59, 999);
+    }
+
+    if (periodo === "proximo-mes") {
+      periodStart = new Date(today.getFullYear(), today.getMonth() + 1, 1);
+      periodEnd = new Date(today.getFullYear(), today.getMonth() + 2, 0);
+      periodEnd.setHours(23, 59, 59, 999);
+    }
+
+    if (
+      periodo === "personalizado" &&
+      dataInicioPersonalizada &&
+      dataFimPersonalizada
+    ) {
+      const customStart = new Date(
+        `${dataInicioPersonalizada}T00:00:00`
+      );
+      const customEnd = new Date(
+        `${dataFimPersonalizada}T23:59:59`
+      );
+
+      if (
+        !Number.isNaN(customStart.getTime()) &&
+        !Number.isNaN(customEnd.getTime()) &&
+        customEnd >= customStart
+      ) {
+        periodStart = customStart;
+        periodEnd = customEnd;
+      }
+    }
+
+    return tasks.filter((task) => {
+      if (isDone(task)) {
+        return false;
+      }
+
+      if (!task.dates?.dueDate) {
+        return false;
+      }
+
+      const dueDate = new Date(task.dates.dueDate);
+
+      if (Number.isNaN(dueDate.getTime())) {
+        return false;
+      }
+
+      return (
+        dueDate.getTime() >= periodStart.getTime() &&
+        dueDate.getTime() <= periodEnd.getTime()
+      );
+    });
+  }, [tasks, periodo, dataInicioPersonalizada, dataFimPersonalizada]);
 
   const developerAllocations = useMemo<DeveloperAllocation[]>(() => {
     const people = new Map<
@@ -347,6 +436,41 @@ export default function AlocacaoPage() {
           <p className="mt-1 text-sm text-zinc-500">
             Visualize a distribuição da equipe entre projetos e demandas.
           </p>
+
+          <div className="mt-4 flex flex-wrap items-center gap-2">
+            <select
+              value={periodo}
+              onChange={(e) => setPeriodo(e.target.value)}
+              className="rounded-xl border border-zinc-200 bg-white px-3 py-2 text-sm font-medium text-zinc-700 outline-none focus:border-zinc-400"
+            >
+              <option value="hoje">Hoje</option>
+              <option value="esta-semana">Esta semana</option>
+              <option value="proxima-semana">Próxima semana</option>
+              <option value="este-mes">Este mês</option>
+              <option value="proximo-mes">Próximo mês</option>
+              <option value="personalizado">Personalizado</option>
+            </select>
+
+            {periodo === "personalizado" && (
+              <>
+                <input
+                  type="date"
+                  value={dataInicioPersonalizada}
+                  onChange={(e) => setDataInicioPersonalizada(e.target.value)}
+                  className="rounded-xl border border-zinc-200 bg-white px-3 py-2 text-sm text-zinc-700 outline-none focus:border-zinc-400"
+                />
+
+                <span className="text-sm text-zinc-400">até</span>
+
+                <input
+                  type="date"
+                  value={dataFimPersonalizada}
+                  onChange={(e) => setDataFimPersonalizada(e.target.value)}
+                  className="rounded-xl border border-zinc-200 bg-white px-3 py-2 text-sm text-zinc-700 outline-none focus:border-zinc-400"
+                />
+              </>
+            )}
+          </div>
         </div>
       </header>
 
@@ -676,6 +800,12 @@ function ProjectAllocation({
     </div>
   );
 }
+
+
+
+
+
+
 
 
 
