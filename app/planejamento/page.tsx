@@ -11,6 +11,9 @@ export default function PlanejamentoPage() {
   const [loading, setLoading] = useState(true);
   const [currentPage, setCurrentPage] = useState(1);
   const [viewMode, setViewMode] = useState<"lista" | "calendario">("lista");
+  const [periodo, setPeriodo] = useState("esta-semana");
+  const [dataInicioPersonalizada, setDataInicioPersonalizada] = useState("");
+  const [dataFimPersonalizada, setDataFimPersonalizada] = useState("");
   const pageSize = 10;
 
   useEffect(() => {
@@ -58,38 +61,6 @@ export default function PlanejamentoPage() {
     const type = String(task.status?.type || "").toLowerCase();
     const name = String(task.status?.name || "").toLowerCase();
 
-    const getCalendarSummary = (dayTasks: any[]) => {
-    const developers = new Map<string, number>();
-    const projects = new Map<string, number>();
-
-    dayTasks.forEach((task: any) => {
-      const responsibles = task.responsible?.length
-        ? task.responsible
-        : ["Sem responsável"];
-
-      responsibles.forEach((name: string) => {
-        developers.set(name, (developers.get(name) || 0) + 1);
-      });
-
-      const project =
-        task.project?.name && task.project.name !== "hidden"
-          ? task.project.name
-          : task.list?.name || "Sem projeto";
-
-      projects.set(project, (projects.get(project) || 0) + 1);
-    });
-
-    return {
-      developers: Array.from(developers.entries())
-        .sort((a, b) => b[1] - a[1])
-        .slice(0, 4),
-      projects: Array.from(projects.entries())
-        .sort((a, b) => b[1] - a[1])
-        .slice(0, 4),
-      totalDevelopers: developers.size,
-      totalProjects: projects.size,
-    };
-  };
   return (
       type === "closed" ||
       type === "done" ||
@@ -211,37 +182,68 @@ export default function PlanejamentoPage() {
     today.setHours(0, 0, 0, 0);
 
     const dayOfWeek = today.getDay();
-    const daysUntilNextMonday =
-      dayOfWeek === 0 ? 1 : 8 - dayOfWeek;
 
-    const nextWeekStart = new Date(today);
-    nextWeekStart.setDate(
-      today.getDate() + daysUntilNextMonday
+    const startOfWeek = new Date(today);
+    const daysSinceMonday = dayOfWeek === 0 ? 6 : dayOfWeek - 1;
+    startOfWeek.setDate(today.getDate() - daysSinceMonday);
+
+    const endOfWeek = new Date(startOfWeek);
+    endOfWeek.setDate(startOfWeek.getDate() + 6);
+    endOfWeek.setHours(23, 59, 59, 999);
+
+    const startOfNextWeek = new Date(startOfWeek);
+    startOfNextWeek.setDate(startOfWeek.getDate() + 7);
+
+    const endOfNextWeek = new Date(startOfNextWeek);
+    endOfNextWeek.setDate(startOfNextWeek.getDate() + 6);
+    endOfNextWeek.setHours(23, 59, 59, 999);
+
+    let periodStart = new Date(startOfWeek);
+    let periodEnd = new Date(endOfWeek);
+
+    if (periodo === "hoje") {
+      periodStart = new Date(today);
+      periodEnd = new Date(today);
+      periodEnd.setHours(23, 59, 59, 999);
+    }
+
+    if (periodo === "proxima-semana") {
+      periodStart = new Date(startOfNextWeek);
+      periodEnd = new Date(endOfNextWeek);
+    }
+
+    if (periodo === "este-mes") {
+      periodStart = new Date(today.getFullYear(), today.getMonth(), 1);
+      periodEnd = new Date(today.getFullYear(), today.getMonth() + 1, 0);
+      periodEnd.setHours(23, 59, 59, 999);
+    }
+
+    if (periodo === "proximo-mes") {
+      periodStart = new Date(today.getFullYear(), today.getMonth() + 1, 1);
+      periodEnd = new Date(today.getFullYear(), today.getMonth() + 2, 0);
+      periodEnd.setHours(23, 59, 59, 999);
+    }
+
+    if (
+      periodo === "personalizado" &&
+      dataInicioPersonalizada &&
+      dataFimPersonalizada
+    ) {
+      const customStart = parseDate(dataInicioPersonalizada);
+      const customEnd = parseDate(dataFimPersonalizada);
+
+      if (customStart && customEnd && customEnd >= customStart) {
+        periodStart = customStart;
+        periodStart.setHours(0, 0, 0, 0);
+
+        periodEnd = customEnd;
+        periodEnd.setHours(23, 59, 59, 999);
+      }
+    }
+
+    const activeTasks = tasks.filter(
+      (task: any) => !isDone(task)
     );
-
-    const nextWeekEnd = new Date(nextWeekStart);
-    nextWeekEnd.setDate(
-      nextWeekStart.getDate() + 6
-    );
-    nextWeekEnd.setHours(23, 59, 59, 999);
-
-    const activeTasks = tasks.filter((task: any) => {
-      if (isDone(task)) return false;
-
-      const status = String(
-        task.status?.name || ""
-      )
-        .trim()
-        .toLowerCase();
-
-      return [
-        "pending/melhoria",
-        "pending/bug",
-        "open",
-        "em progresso",
-        "in progress",
-      ].includes(status);
-    });
 
     const weeklyTasks = activeTasks
       .map((task: any) => {
@@ -267,11 +269,11 @@ export default function PlanejamentoPage() {
           };
         }
 
-        const dueNextWeek =
-          dueDate.getTime() >= nextWeekStart.getTime() &&
-          dueDate.getTime() <= nextWeekEnd.getTime();
+        const dueInPeriod =
+          dueDate.getTime() >= periodStart.getTime() &&
+          dueDate.getTime() <= periodEnd.getTime();
 
-        if (!dueNextWeek) return null;
+        if (!dueInPeriod) return null;
 
         return {
           ...task,
@@ -315,15 +317,14 @@ export default function PlanejamentoPage() {
     });
 
     return {
-      nextWeekStart,
-      nextWeekEnd,
+      periodStart,
+      periodEnd,
       tasks: weeklyTasks,
       developers: Array.from(developers.values()).sort(
         (a, b) => b.tasks.length - a.tasks.length
       ),
     };
-  }, [tasks]);
-
+  }, [tasks, periodo, dataInicioPersonalizada, dataFimPersonalizada]);
   const developerGroups = useMemo(() => {
     const developers = new Map<string, any>();
 
@@ -372,9 +373,15 @@ export default function PlanejamentoPage() {
     currentPage * pageSize
   );
   const calendarDays = useMemo(() => {
-    return Array.from({ length: 7 }, (_, index) => {
-      const date = new Date(planning.nextWeekStart);
-      date.setDate(planning.nextWeekStart.getDate() + index);
+    const totalDays =
+      Math.floor(
+        (planning.periodEnd.getTime() - planning.periodStart.getTime()) /
+          (1000 * 60 * 60 * 24)
+      ) + 1;
+
+    return Array.from({ length: totalDays }, (_, index) => {
+      const date = new Date(planning.periodStart);
+      date.setDate(planning.periodStart.getDate() + index);
       date.setHours(0, 0, 0, 0);
 
       const tasks = planning.tasks
@@ -398,7 +405,7 @@ export default function PlanejamentoPage() {
         tasks,
       };
     });
-  }, [planning.tasks, planning.nextWeekStart]);
+  }, [planning.tasks, planning.periodStart, planning.periodEnd]);
   const getDayLoad = (count: number) => {
     if (count === 0) {
       return {
@@ -492,7 +499,7 @@ export default function PlanejamentoPage() {
           </h1>
 
           <p className="mt-1 text-sm text-zinc-500">
-            Organização das demandas por desenvolvedor para a próxima semana.
+            Organização das demandas por desenvolvedor para o período selecionado.
           </p>
         </div>
 
@@ -522,20 +529,52 @@ export default function PlanejamentoPage() {
       <main className="space-y-6 p-5 lg:p-8">
         <section className="rounded-2xl border border-zinc-200 bg-white p-6 shadow-sm">
           <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-            <div>
-              <div className="flex items-center gap-2">
-                <CalendarDays className="h-5 w-5 text-zinc-600" />
+              <div className="flex flex-col gap-3">
+                <div className="flex items-center gap-2">
+                  <CalendarDays className="h-5 w-5 text-zinc-600" />
+                  <h2 className="font-semibold">
+                    Planejamento por período
+                  </h2>
+                </div>
 
-                <h2 className="font-semibold">
-                  Próxima semana
-                </h2>
+                <div className="flex flex-wrap items-center gap-2">
+                  <select
+                    value={periodo}
+                    onChange={(e) => setPeriodo(e.target.value)}
+                    className="rounded-xl border border-zinc-200 bg-white px-3 py-2 text-sm font-medium text-zinc-700 outline-none focus:border-zinc-400"
+                  >
+                    <option value="hoje">Hoje</option>
+                    <option value="esta-semana">Esta semana</option>
+                    <option value="proxima-semana">Próxima semana</option>
+                    <option value="este-mes">Este mês</option>
+                    <option value="proximo-mes">Próximo mês</option>
+                    <option value="personalizado">Personalizado</option>
+                  </select>
+
+                  {periodo === "personalizado" && (
+                    <>
+                      <input
+                        type="date"
+                        value={dataInicioPersonalizada}
+                        onChange={(e) => setDataInicioPersonalizada(e.target.value)}
+                        className="rounded-xl border border-zinc-200 bg-white px-3 py-2 text-sm text-zinc-700 outline-none focus:border-zinc-400"
+                      />
+                      <span className="text-sm text-zinc-400">até</span>
+                      <input
+                        type="date"
+                        value={dataFimPersonalizada}
+                        onChange={(e) => setDataFimPersonalizada(e.target.value)}
+                        className="rounded-xl border border-zinc-200 bg-white px-3 py-2 text-sm text-zinc-700 outline-none focus:border-zinc-400"
+                      />
+                    </>
+                  )}
+                </div>
+
+                <p className="text-sm text-zinc-500">
+                  {formatDate(planning.periodStart)} –{" "}
+                  {formatDate(planning.periodEnd)}
+                </p>
               </div>
-
-              <p className="mt-1 text-sm text-zinc-500">
-                {formatDate(planning.nextWeekStart)} –{" "}
-                {formatDate(planning.nextWeekEnd)}
-              </p>
-            </div>
 
             <div className="flex items-center gap-2 text-sm text-zinc-500">
               <Clock3 className="h-4 w-4" />
@@ -639,7 +678,7 @@ export default function PlanejamentoPage() {
 
               <p className="mt-1 text-sm text-zinc-500">
                 {viewMode === "lista"
-                  ? "Demandas previstas para a próxima semana."
+                  ? "Demandas previstas para o período selecionado."
                   : "Entregas organizadas por dia conforme o prazo definido no ClickUp."}
               </p>
             </div>
@@ -820,7 +859,7 @@ export default function PlanejamentoPage() {
           ) : planning.developers.length === 0 ? (
             <div className="rounded-2xl border border-dashed border-zinc-300 bg-white p-8 text-center">
               <p className="text-sm font-medium text-zinc-700">
-                Nenhuma demanda encontrada para a próxima semana.
+                Nenhuma demanda encontrada para o período selecionado.
               </p>
             </div>
           ) : (
@@ -1194,6 +1233,9 @@ export default function PlanejamentoPage() {
     </div>
   );
 }
+
+
+
 
 
 
