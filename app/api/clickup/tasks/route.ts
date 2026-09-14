@@ -1,4 +1,6 @@
 import { NextResponse } from "next/server";
+
+import { persistClickUpSnapshot } from "@/lib/clickup-db";
 import fs from "fs";
 import path from "path";
 
@@ -47,7 +49,6 @@ type ClickUpTask = {
   folder?: {
     id?: string;
     name?: string;
-    color?: string | null;
     hidden?: boolean;
   };
   project?: {
@@ -73,7 +74,6 @@ type ClickUpList = {
   folder?: {
     id?: string;
     name?: string;
-    color?: string | null;
     hidden?: boolean;
   };
 };
@@ -159,7 +159,6 @@ async function getListsFromSpace(
             folder: {
               id: folder.id,
               name: folder.name,
-              color: folder.color || null,
             },
           }))
         );
@@ -334,20 +333,13 @@ function normalizeTask(task: ClickUpTask, listMeta?: ClickUpList) {
         null,
 
       name:
-        listMeta?.folder?.name ||
-        (task.folder?.name && task.folder.name !== "hidden"
-          ? task.folder.name
-          : null) ||
+        task.folder?.name ||
         (task.project?.name &&
         task.project.name !== "hidden"
           ? task.project.name
           : null) ||
         task.list?.name ||
         "Sem projeto",
-
-      color:
-        listMeta?.folder?.color ||
-        null,
     },
 
     list: {
@@ -457,7 +449,11 @@ export async function GET() {
               error
             );
 
-            return [];
+            throw new Error(
+              `Falha ao sincronizar a lista "${list.name}": ${
+                error instanceof Error ? error.message : String(error)
+              }`
+            );
           }
         })
       );
@@ -558,6 +554,12 @@ export async function GET() {
       tasks: normalizedTasks,
     };
 
+    await persistClickUpSnapshot({
+      projects: Array.from(projects.values()),
+      tasks: normalizedTasks,
+    });
+
+    console.log("Snapshot ClickUp persistido no MySQL com sucesso.");
     const cachePath = path.join(
       process.cwd(),
       "data",
@@ -640,16 +642,6 @@ export async function GET() {
     );
   }
 }
-
-
-
-
-
-
-
-
-
-
 
 
 
