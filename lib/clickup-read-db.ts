@@ -95,6 +95,7 @@ export async function getClickUpSnapshotFromDb() {
 
       creator: task.creator
         ? {
+            name: task.creator,
             username: task.creator,
           }
         : null,
@@ -114,4 +115,5 @@ export async function getClickUpSnapshotFromDb() {
     })),
   };
 }
+
 
