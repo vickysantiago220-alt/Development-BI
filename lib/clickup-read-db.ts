@@ -1,6 +1,8 @@
 import { db } from "./db";
 
 export async function getClickUpSnapshotFromDb() {
+  const [lastSyncRows] = await db.query("SELECT finished_at FROM bi_clickup_sync_history WHERE status = 'success' ORDER BY id DESC LIMIT 1");
+  const lastSyncedAt = (lastSyncRows as any[])[0]?.finished_at || null;
   const [projects] = await db.query(`
     SELECT
       clickup_id,
@@ -39,6 +41,7 @@ export async function getClickUpSnapshotFromDb() {
 
   return {
     success: true,
+    lastSyncedAt,
     projects: (projects as any[]).map((project) => ({
       id: project.clickup_id,
       name: project.name,
@@ -116,6 +119,12 @@ export async function getClickUpSnapshotFromDb() {
     })),
   };
 }
+
+
+
+
+
+
 
 
 

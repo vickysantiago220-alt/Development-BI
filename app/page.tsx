@@ -199,6 +199,7 @@ function DashboardContent() {
   const [loading, setLoading] = useState(true);
   const [metricsData, setMetricsData] = useState<any>(null);
   const [metricsLoading, setMetricsLoading] = useState(true);
+  const [lastSyncedAt, setLastSyncedAt] = useState<string | null>(null);
 
   useEffect(() => {
     fetch("/api/clickup/cache", { cache: "no-store" })
@@ -209,7 +210,10 @@ function DashboardContent() {
 
         return response.json();
       })
-      .then((data) => setCacheData(data))
+      .then((data) => {
+        setCacheData(data);
+        setLastSyncedAt(data.lastSyncedAt || null);
+      })
       .catch((error) =>
         console.error("Erro ao carregar cache:", error)
       )
@@ -808,10 +812,17 @@ function DashboardContent() {
             : "Normal",
       }));
 
+  const formattedLastSync = lastSyncedAt
+    ? new Intl.DateTimeFormat("pt-BR", {
+        dateStyle: "short",
+        timeStyle: "short",
+        timeZone: "America/Sao_Paulo",
+      }).format(new Date(lastSyncedAt))
+    : "Não disponível";
   return (
     <div className="min-h-screen bg-[#f7f7f8]">
       {/* HEADER */}
-      <header className="flex h-20 items-center justify-between border-b border-zinc-200 bg-white px-5 lg:px-8">
+      <header className="flex min-h-24 items-center justify-between border-b border-zinc-200 bg-white px-5 py-3 lg:px-8">
         <div>
           <p className="text-xs font-medium uppercase tracking-widest text-zinc-400">
             Visão geral
@@ -822,6 +833,9 @@ function DashboardContent() {
           </h1>
           <p className="mt-1 text-xs text-slate-500">
             Período analisado: <span className="font-medium text-slate-700">{period.label}</span>
+          </p>
+          <p className="mt-1 text-xs text-slate-400">
+            Última sincronização com ClickUp: <span className="font-medium text-slate-600">{formattedLastSync}</span>
           </p>
         </div>
 
@@ -1318,6 +1332,14 @@ export default function Home() {
     </Suspense>
   );
 }
+
+
+
+
+
+
+
+
 
 
 
