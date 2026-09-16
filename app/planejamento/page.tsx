@@ -108,35 +108,21 @@ export default function PlanejamentoPage() {
   };
 
   const getProjectPriority = (task: any) => {
-    const color = String(
-      task.list?.color || ""
-    ).trim().toLowerCase();
+    const priority = String(
+      task.project?.priority || ""
+    )
+      .trim()
+      .toLowerCase();
 
-    const colorStatus = String(
-      task.list?.colorStatus || ""
-    ).trim().toLowerCase();
-
-    if (
-      color === "#d33d44" ||
-      colorStatus === "red" ||
-      colorStatus === "vermelho"
-    ) {
+    if (["alta", "high", "urgent", "urgente"].includes(priority)) {
       return "Alta";
     }
 
-    if (
-      color === "#f1c40f" ||
-      colorStatus === "yellow" ||
-      colorStatus === "amarelo"
-    ) {
+    if (["média", "media", "medium"].includes(priority)) {
       return "Média";
     }
 
-    if (
-      color === "#008844" ||
-      colorStatus === "green" ||
-      colorStatus === "verde"
-    ) {
+    if (["baixa", "low"].includes(priority)) {
       return "Baixa";
     }
 

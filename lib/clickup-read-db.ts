@@ -67,12 +67,13 @@ export async function getClickUpSnapshotFromDb() {
         : null,
 
       status: task.status
-          ? {
-              status: task.status,
-              color: task.status_color,
-              type: task.status_type,
-            }
-          : null,
+        ? {
+            name: task.status,
+            status: task.status,
+            color: task.status_color,
+            type: task.status_type,
+          }
+        : null,
 
       priority: task.priority
           ? {
@@ -115,5 +116,6 @@ export async function getClickUpSnapshotFromDb() {
     })),
   };
 }
+
 
 

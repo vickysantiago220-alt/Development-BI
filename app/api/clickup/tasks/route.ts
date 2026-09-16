@@ -320,6 +320,36 @@ const PROJECT_PRIORITY_FALLBACKS: Record<string, string> = {
   "901314544488": "Baixa",
 };
 
+const CLICKUP_HIDDEN_PROJECT_NAMES: Record<string, string> = {
+  "1000210000000880": "Mais Piscinas",
+  "1000210000000878": "Neto Veículos - Painel Novo",
+  "1000210000000874": "R&P Engenharia",
+  "1000210000000879": "Sinergia Soluções",
+  "1000210000000872": "Site Seprem",
+  "1000210000004558": "Beatriz Abrão - Portfólio",
+  "901312152480": "SIGMA",
+  "901318223134": "SUPER DIFUSORA",
+  "1000210000000873": "Neto Veículos - Site",
+  "901317970592": "Isalu - E-commerce",
+  "1000210000003280": "Nosso Lar",
+  "1000210000005156": "Atimo Soluções",
+  "1000210000000871": "Truco Pensado",
+};
+const CLICKUP_CREATOR_NAMES: Record<number, string> = {
+  112136775: "Agente Soft",
+  111966786: "Victor Polonio",
+  87981689: "Victória Oliveira",
+  82041194: "Vitor Cesar Kravszenko",
+  82037015: "Renan Henrique Rodrigues Diniz",
+  55057891: "Gabriel Klein",
+  55005149: "Christian Nagata",
+  55014837: "Marcos Koodi Orita",
+  55096433: "Lucas V.",
+  44266440: "kenji orita",
+  55014836: "Otavio Cardena",
+  55172098: "Matheus Franco",
+  55090597: "Matheus Diniz",
+};
 function normalizeTask(task: ClickUpTask, listMeta?: ClickUpList) {
   return {
     id: task.id,
@@ -334,7 +364,9 @@ function normalizeTask(task: ClickUpTask, listMeta?: ClickUpList) {
     creator: task.creator
       ? {
           id: task.creator.id,
-          name: task.creator.username,
+          name:
+            CLICKUP_CREATOR_NAMES[Number(task.creator.id)] ||
+            task.creator.username,
           email: task.creator.email || null,
         }
       : null,
@@ -347,7 +379,8 @@ function normalizeTask(task: ClickUpTask, listMeta?: ClickUpList) {
         null,
 
       name:
-        task.folder?.name ||
+        CLICKUP_HIDDEN_PROJECT_NAMES[String(task.project?.id || '')] ||
+        (task.folder?.name && task.folder.name !== 'hidden' ? task.folder.name : null) ||
         (task.project?.name &&
         task.project.name !== "hidden"
           ? task.project.name
@@ -448,6 +481,7 @@ export async function GET() {
 
     const lists = await getListsFromSpace(token);
     const enrichedLists = await enrichListColors(token, lists);
+
 
     console.log(`Lists encontradas: ${lists.length}`);
 
@@ -709,28 +743,6 @@ export async function GET() {
     );
   }
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 
 

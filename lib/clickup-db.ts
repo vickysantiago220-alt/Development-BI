@@ -96,7 +96,7 @@ function getAssignee(task: ClickUpTask) {
 }
 
 function getCreator(task: ClickUpTask) {
-  return task.creator?.username || task.creator?.email || null;
+  return (task.creator as any)?.name || task.creator?.username || task.creator?.email || null;
 }
 
 async function persistProjects(
@@ -255,6 +255,14 @@ export async function persistClickUpSnapshot({
     await persistProjects(connection, projects);
     await persistTasks(connection, tasks);
 
+    await connection.execute(
+      `
+        DELETE FROM bi_clickup_tasks
+        WHERE last_synced_at < ?
+      `,
+      [startedAt]
+    );
+
     const finishedAt = new Date();
 
     await connection.execute(
@@ -322,4 +330,8 @@ export async function persistClickUpSnapshot({
     connection.release();
   }
 }
+
+
+
+
 
