@@ -14,6 +14,7 @@ type Task = {
     id?: string;
     name?: string;
     color?: string | null;
+    priority?: string | null;
   };
   list?: {
     id?: string;
@@ -30,7 +31,10 @@ type Task = {
   };
 };
 
-function getProjectColor(color?: string | null) {
+function getProjectColor(color?: string | null, priority?: string | null) {
+  if (priority === "Alta") return "#d33d44";
+  if (priority === "Média") return "#f1c40f";
+  if (priority === "Baixa") return "#008844";
   return color || "#71717a";
 }
 
@@ -93,6 +97,13 @@ function isDevelopment(task: Task) {
 }
 
 function getProjectPriority(tasks: Task[]) {
+  for (const task of tasks) {
+    const projectPriority = String(task.project?.priority || "").trim();
+    if (["Alta", "Média", "Baixa"].includes(projectPriority)) {
+      return projectPriority;
+    }
+  }
+
   const counts: Record<string, number> = {
     Alta: 0,
     Média: 0,
@@ -420,12 +431,12 @@ export default function ProjetosPage() {
                       window.location.href = `/projetos/${encodeURIComponent(project.name)}`;
                     }
                   }}
-                  className="cursor-pointer rounded-2xl border-2 p-5 transition-shadow hover:shadow-md" style={{ borderColor: getProjectColor(project.color) }}
+                  className="cursor-pointer rounded-2xl border-2 p-5 transition-shadow hover:shadow-md" style={{ borderColor: getProjectColor(project.color, project.priority) }}
                 >
                   <div className="flex items-start justify-between">
                     <div className="flex items-center gap-3">
-                      <div className="flex h-10 w-10 items-center justify-center rounded-xl" style={{ backgroundColor: `${getProjectColor(project.color)}20` }}>
-                        <FolderKanban className="h-5 w-5" style={{ color: getProjectColor(project.color) }} />
+                      <div className="flex h-10 w-10 items-center justify-center rounded-xl" style={{ backgroundColor: `${getProjectColor(project.color, project.priority)}20` }}>
+                        <FolderKanban className="h-5 w-5" style={{ color: getProjectColor(project.color, project.priority) }} />
                       </div>
 
                       <div className="min-w-0">
@@ -466,7 +477,7 @@ export default function ProjetosPage() {
 
                     <div className="h-2 overflow-hidden rounded-full bg-zinc-100">
                       <div
-                        className="h-full rounded-full" style={{ width: `${project.progress}%`, backgroundColor: getProjectColor(project.color) }}
+                        className="h-full rounded-full" style={{ width: `${project.progress}%`, backgroundColor: getProjectColor(project.color, project.priority) }}
                         
                       />
                     </div>
@@ -570,6 +581,14 @@ function Metric({
     </div>
   );
 }
+
+
+
+
+
+
+
+
 
 
 
