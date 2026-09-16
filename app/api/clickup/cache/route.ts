@@ -1,46 +1,18 @@
-import fs from "fs";
-import path from "path";
 import { NextResponse } from "next/server";
+import { getClickUpSnapshotFromDb } from "@/lib/clickup-read-db";
 
 export async function GET() {
   try {
-    const cachePath = path.join(
-      process.cwd(),
-      "data",
-      "clickup-cache.json"
-    );
+    const data = await getClickUpSnapshotFromDb();
 
-    if (!fs.existsSync(cachePath)) {
-      return NextResponse.json(
-        {
-          success: false,
-          error: "Cache do ClickUp não encontrado.",
-        },
-        { status: 404 }
-      );
-    }
-
-    const cache = fs.readFileSync(
-      cachePath,
-      "utf8"
-    );
-
-    if (!cache.trim()) {
-      return NextResponse.json(
-        {
-          success: false,
-          error: "Cache do ClickUp está vazio.",
-        },
-        { status: 404 }
-      );
-    }
-
-    const data = JSON.parse(cache);
-
-    return NextResponse.json(data);
+    return NextResponse.json(data, {
+      headers: {
+        "Cache-Control": "private, max-age=30, stale-while-revalidate=60",
+      },
+    });
   } catch (error) {
     console.error(
-      "Erro ao ler cache do ClickUp:",
+      "Erro ao consultar snapshot do ClickUp no MySQL:",
       error
     );
 
@@ -50,7 +22,7 @@ export async function GET() {
         error:
           error instanceof Error
             ? error.message
-            : "Erro ao ler cache do ClickUp.",
+            : "Erro ao consultar dados do ClickUp.",
       },
       { status: 500 }
     );

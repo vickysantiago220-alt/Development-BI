@@ -1,0 +1,111 @@
+import { db } from "./db";
+
+export async function getClickUpSnapshotFromDb() {
+  const [projects] = await db.query(`
+    SELECT
+      clickup_id,
+      name,
+      color,
+      status,
+      priority
+    FROM bi_clickup_projects
+    ORDER BY name
+  `);
+
+  const [tasks] = await db.query(`
+    SELECT
+      clickup_id,
+      name,
+      project_clickup_id,
+      project_name,
+      project_color,
+      list_clickup_id,
+      list_name,
+      status,
+      priority,
+      assignee,
+      creator,
+      date_created,
+      date_due,
+      date_done,
+      time_estimate,
+      time_spent,
+      task_url
+    FROM bi_clickup_tasks
+    ORDER BY date_due IS NULL, date_due
+  `);
+
+  return {
+    success: true,
+    projects: (projects as any[]).map((project) => ({
+      id: project.clickup_id,
+      name: project.name,
+      color: project.color,
+      status: project.status,
+      priority: project.priority,
+    })),
+    tasks: (tasks as any[]).map((task) => ({
+      id: task.clickup_id,
+      name: task.name,
+
+      project: task.project_clickup_id
+        ? {
+            id: task.project_clickup_id,
+            name: task.project_name,
+            color: task.project_color,
+          }
+        : null,
+
+      list: task.list_clickup_id
+        ? {
+            id: task.list_clickup_id,
+            name: task.list_name,
+          }
+        : null,
+
+      status: task.status
+        ? {
+            status: task.status,
+          }
+        : null,
+
+      priority: task.priority
+        ? {
+            priority: task.priority,
+          }
+        : null,
+
+      responsible: task.assignee
+        ? task.assignee
+            .split(",")
+            .map((username: string) => username.trim())
+            .filter(Boolean)
+            .map((username: string) => ({
+              id: username,
+              name: username,
+              username,
+            }))
+        : [],
+
+      creator: task.creator
+        ? {
+            username: task.creator,
+          }
+        : null,
+
+      dates: {
+        createdAt: task.date_created,
+        dueDate: task.date_due,
+        dateDone: task.date_done,
+      },
+
+      hours: {
+        estimated: task.time_estimate,
+        tracked: task.time_spent,
+      },
+
+      url: task.task_url,
+    })),
+  };
+}
+

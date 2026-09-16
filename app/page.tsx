@@ -197,6 +197,8 @@ function DashboardContent() {
 
   const [cacheData, setCacheData] = useState<any>(null);
   const [loading, setLoading] = useState(true);
+  const [metricsData, setMetricsData] = useState<any>(null);
+  const [metricsLoading, setMetricsLoading] = useState(true);
 
   useEffect(() => {
     fetch("/api/clickup/cache", { cache: "no-store" })
@@ -213,6 +215,29 @@ function DashboardContent() {
       )
       .finally(() => setLoading(false));
   }, []);
+  useEffect(() => {
+    const start = period.start.toISOString();
+    const end = period.end.toISOString();
+
+    setMetricsLoading(true);
+
+    fetch(
+      `/api/clickup/metrics?start=${encodeURIComponent(start)}&end=${encodeURIComponent(end)}`,
+      { cache: "no-store" }
+    )
+      .then((response) => {
+        if (!response.ok) {
+          throw new Error("Não foi possível carregar as métricas.");
+        }
+
+        return response.json();
+      })
+      .then((data) => setMetricsData(data))
+      .catch((error) =>
+        console.error("Erro ao carregar métricas:", error)
+      )
+      .finally(() => setMetricsLoading(false));
+  }, [period.start.getTime(), period.end.getTime()]);
 
   const tasks = Array.isArray(cacheData?.tasks)
     ? cacheData.tasks
@@ -1293,6 +1318,8 @@ export default function Home() {
     </Suspense>
   );
 }
+
+
 
 
 

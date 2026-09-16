@@ -22,6 +22,8 @@ type ClickUpTask = {
   } | null;
   status?: {
     name?: string | null;
+    color?: string | null;
+    type?: string | null;
   } | null;
   priority?: {
     priority?: string | null;
@@ -75,9 +77,19 @@ function getPriority(priority: ClickUpTask["priority"]) {
 }
 
 function getAssignee(task: ClickUpTask) {
+  const people =
+    task.assignees ||
+    (Array.isArray((task as any).responsible)
+      ? (task as any).responsible
+      : []);
+
   return (
-    task.assignees
-      ?.map((assignee) => assignee.username || assignee.email)
+    people
+      .map((person: any) =>
+        person.username ||
+        person.name ||
+        person.email
+      )
       .filter(Boolean)
       .join(", ") || null
   );
@@ -148,7 +160,7 @@ async function persistTasks(
     const placeholders = batch
       .map(
         () =>
-          "(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())"
+          "(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())"
       )
       .join(", ");
 
@@ -161,6 +173,8 @@ async function persistTasks(
       task.list?.name || null,
       task.name || null,
       task.status?.name || null,
+      task.status?.color || null,
+      task.status?.type || null,
       getPriority(task.priority),
       getAssignee(task),
       getCreator(task),
@@ -184,6 +198,8 @@ async function persistTasks(
             list_name,
             name,
             status,
+            status_color,
+            status_type,
             priority,
             assignee,
             creator,
@@ -204,6 +220,8 @@ async function persistTasks(
           list_name = VALUES(list_name),
           name = VALUES(name),
           status = VALUES(status),
+          status_color = VALUES(status_color),
+          status_type = VALUES(status_type),
           priority = VALUES(priority),
           assignee = VALUES(assignee),
           creator = VALUES(creator),
