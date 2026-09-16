@@ -22,6 +22,8 @@ export async function getClickUpSnapshotFromDb() {
       list_clickup_id,
       list_name,
       status,
+      status_color,
+      status_type,
       priority,
       assignee,
       creator,
@@ -53,6 +55,7 @@ export async function getClickUpSnapshotFromDb() {
             id: task.project_clickup_id,
             name: task.project_name,
             color: task.project_color,
+            priority: (projects as any[]).find((project) => project.clickup_id === task.project_clickup_id)?.priority || null,
           }
         : null,
 
@@ -64,16 +67,19 @@ export async function getClickUpSnapshotFromDb() {
         : null,
 
       status: task.status
-        ? {
-            status: task.status,
-          }
-        : null,
+          ? {
+              status: task.status,
+              color: task.status_color,
+              type: task.status_type,
+            }
+          : null,
 
       priority: task.priority
-        ? {
-            priority: task.priority,
-          }
-        : null,
+          ? {
+              name: task.priority,
+              priority: task.priority,
+            }
+          : null,
 
       responsible: task.assignee
         ? task.assignee

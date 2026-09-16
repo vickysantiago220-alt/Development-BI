@@ -306,6 +306,20 @@ async function enrichListColors(
 
   return enriched;
 }
+const PROJECT_PRIORITY_FALLBACKS: Record<string, string> = {
+  "90136496359": "Média",
+  "1000210000001452": "Média",
+  "1000210000001049": "Alta",
+  "90130002253": "Baixa",
+  "1000210000004507": "Baixa",
+  "901314585529": "Baixa",
+  "901316327452": "Baixa",
+  "901311935227": "Baixa",
+  "901316635403": "Baixa",
+  "901314570767": "Média",
+  "901314544488": "Baixa",
+};
+
 function normalizeTask(task: ClickUpTask, listMeta?: ClickUpList) {
   return {
     id: task.id,
@@ -340,6 +354,15 @@ function normalizeTask(task: ClickUpTask, listMeta?: ClickUpList) {
           : null) ||
         task.list?.name ||
         "Sem projeto",
+
+      color:
+        (task.project as any)?.color ||
+        (task.folder as any)?.color ||
+        listMeta?.color ||
+        task.list?.color ||
+        null,
+
+      priority: null as string | null,
     },
 
     list: {
@@ -471,6 +494,24 @@ export async function GET() {
       normalizeTask(task, listMetaById.get(task.list?.id || ""))
     );
 
+    normalizedTasks.forEach((task) => {
+      const projectId = String(task.project?.id || "");
+      const projectColor = String(task.project?.color || "")
+        .trim()
+        .toLowerCase();
+
+      if (PROJECT_PRIORITY_FALLBACKS[projectId]) {
+        task.project.priority = PROJECT_PRIORITY_FALLBACKS[projectId];
+      } else if (projectColor === "#d33d44") {
+        task.project.priority = "Alta";
+      } else if (projectColor === "#f1c40f") {
+        task.project.priority = "Média";
+      } else if (projectColor === "#008844") {
+        task.project.priority = "Baixa";
+      } else {
+        task.project.priority = null;
+      }
+    });
     const developers = new Map();
 
     normalizedTasks.forEach((task) => {
@@ -482,11 +523,30 @@ export async function GET() {
     const projects = new Map();
 
     normalizedTasks.forEach((task) => {
-      if (task.project.id) {
-        projects.set(task.project.id, task.project);
+      const projectId = task.project?.id;
+      if (!projectId) return;
+
+      const currentProject = projects.get(projectId);
+      const priority = task.project?.priority || null;
+      const priorityColor = priority === "Alta" ? "#d33d44" : priority === "Média" ? "#f1c40f" : priority === "Baixa" ? "#008844" : null;
+
+      if (!currentProject) {
+        projects.set(projectId, {
+          ...task.project,
+          priority,
+          color: task.project?.color || priorityColor,
+        });
+        return;
+      }
+
+      if (!currentProject.priority && priority) {
+        projects.set(projectId, {
+          ...currentProject,
+          priority,
+          color: currentProject.color || priorityColor,
+        });
       }
     });
-
     const statusCounts: Record<string, number> = {};
 
     normalizedTasks.forEach((task) => {
@@ -649,6 +709,17 @@ export async function GET() {
     );
   }
 }
+
+
+
+
+
+
+
+
+
+
+
 
 
 
