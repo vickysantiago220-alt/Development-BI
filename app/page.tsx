@@ -588,37 +588,37 @@ function DashboardContent() {
   const liveMetrics = [
     {
       title: "Projetos ativos",
-      value: loading ? "—" : String(activeProjects),
+      value: metricsLoading ? "—" : String(metricsData?.activeProjects ?? 0),
       description: "Com demandas em andamento",
       icon: FolderKanban,
     },
     {
       title: "Demandas ativas",
-      value: loading ? "—" : String(activeTasks.length),
+      value: metricsLoading ? "—" : String(metricsData?.active ?? 0),
       description: "No período selecionado",
       icon: ListTodo,
     },
     {
       title: "Demandas criadas",
-      value: loading ? "—" : String(createdInPeriod.length),
+      value: metricsLoading ? "—" : String(metricsData?.created ?? 0),
       description: "Criadas no período",
       icon: ArrowUpRight,
     },
     {
       title: "Entregues",
-      value: loading ? "—" : String(completedTasks.length),
+      value: metricsLoading ? "—" : String(metricsData?.completed ?? 0),
       description: "Concluídas no período",
       icon: CheckCircle2,
     },
     {
       title: "Bugs",
-      value: String(bugsInPeriod.length),
+      value: metricsLoading ? "—" : String(metricsData?.bugs ?? 0),
       description: "Bugs identificados no período",
       icon: AlertTriangle,
     },
     {
       title: "Em atraso",
-      value: String(overdueTasks.length),
+      value: metricsLoading ? "—" : String(metricsData?.overdue ?? 0),
       description: "Prazo vencido e não concluídas",
       icon: Clock3,
     },
@@ -938,7 +938,7 @@ function DashboardContent() {
             <div className="mt-6 space-y-3">
               <Attention
                 color="bg-red-500"
-                title={`${overdueTasks.length} demandas atrasadas`}
+                title={`${metricsData?.overdue ?? 0} demandas atrasadas`}
                 description="Demandas que ultrapassaram o prazo definido."
               />
 
@@ -950,7 +950,7 @@ function DashboardContent() {
 
               <Attention
                 color="bg-amber-500"
-                title={`${periodTasks.filter((task: any) => String(task.status?.name || "").trim().toLowerCase() === "blocked").length} demandas bloqueadas`}
+                title={`${metricsData?.blocked ?? 0} demandas bloqueadas`}
                 description="Demandas que dependem de alguma ação externa."
               />
             </div>
@@ -1332,6 +1332,8 @@ export default function Home() {
     </Suspense>
   );
 }
+
+
 
 
 
