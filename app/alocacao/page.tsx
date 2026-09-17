@@ -2,7 +2,7 @@
 
 import {
   AlertTriangle,
-  ArrowUpRight,
+
   BarChart3,
   CheckCircle2,
   FolderKanban,
@@ -699,7 +699,7 @@ function DeveloperRow({
           </div>
         </div>
 
-        <div className="flex items-center gap-8 xl:w-[420px] xl:justify-end">
+        <div className="flex items-center gap-6 xl:w-[360px] xl:justify-end">
           <div>
             <p className="text-[10px] uppercase tracking-wide text-zinc-400">
               Demandas
@@ -731,13 +731,6 @@ function DeveloperRow({
           >
             {developer.status}
           </span>
-
-          <button
-            className="flex h-8 w-8 items-center justify-center rounded-lg hover:bg-zinc-100"
-            title="Ver demandas"
-          >
-            <ArrowUpRight className="h-4 w-4 text-zinc-500" />
-          </button>
         </div>
       </div>
     </div>
@@ -800,6 +793,9 @@ function ProjectAllocation({
     </div>
   );
 }
+
+
+
 
 
 
