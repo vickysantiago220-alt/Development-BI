@@ -68,12 +68,12 @@ export default function Sidebar() {
 
   return (
     <aside className="sticky top-0 hidden h-screen w-64 shrink-0 overflow-y-auto border-r border-zinc-200 bg-white lg:flex lg:flex-col">
-      <div className="flex h-20 items-center border-b border-zinc-100 px-6">
+      <div className="flex h-32 items-center border-b border-zinc-100 px-6">
         <div className="flex items-center">
           <img
             src="/dev-management-logo-color.svg"
             alt="DEV MANAGEMENT"
-            className="h-20 w-auto"
+            className="h-32 w-auto"
           />
         </div>
       </div>
@@ -118,6 +118,9 @@ export default function Sidebar() {
     </aside>
   );
 }
+
+
+
 
 
 
