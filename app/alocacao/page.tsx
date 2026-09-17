@@ -699,7 +699,7 @@ function DeveloperRow({
           </div>
         </div>
 
-        <div className="flex items-center gap-6 xl:w-[360px] xl:justify-end">
+        <div className="grid grid-cols-[80px_80px_1fr] items-center gap-6 xl:w-[360px]">
           <div>
             <p className="text-[10px] uppercase tracking-wide text-zinc-400">
               Demandas
@@ -793,6 +793,7 @@ function ProjectAllocation({
     </div>
   );
 }
+
 
 
 
